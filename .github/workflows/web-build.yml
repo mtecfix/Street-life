@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
     paths: ["game/**", ".github/workflows/web-build.yml"]
+
+concurrency:
+  group: street-hustler-web-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   export-web:
     runs-on: ubuntu-latest
@@ -11,12 +16,23 @@ jobs:
       image: barichello/godot-ci:4.3
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Godot 4.3 export templates
+        run: |
+          TEMPLATE_DIR="$HOME/.local/share/godot/export_templates/4.3.stable"
+          mkdir -p "$TEMPLATE_DIR" /tmp/godot-templates
+          wget -q "https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz" -O /tmp/godot-templates/export_templates.tpz
+          unzip -q /tmp/godot-templates/export_templates.tpz -d /tmp/godot-templates
+          cp -R /tmp/godot-templates/templates/. "$TEMPLATE_DIR/"
+
       - name: Import project
         run: godot --headless --path game --editor --quit
+
       - name: Export Web
         run: |
           mkdir -p game/build/web
           godot --headless --path game --export-release "Web" game/build/web/index.html
+
       - uses: actions/upload-artifact@v4
         with:
           name: street-hustler-web
