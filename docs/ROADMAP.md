@@ -11,20 +11,25 @@
 - [ ] Validate web export in target browsers.
 
 ## Sprint 2 — Interaction and encounter quality
-- Add NPC interaction prompts and dialogue.
-- Add enemy state machine and telegraphed attacks.
-- Add health, damage, defeat and encounter results.
-- Add a simple mission objective.
+- [x] Add NPC interaction prompts and dialogue.
+- [x] Add enemy state machine and telegraphed attacks.
+- [x] Add health, damage, defeat and encounter results.
+- [x] Add a simple mission objective.
 
 ## Sprint 3 — Living neighborhood
-- Add NPC schedule data and WorldClock integration.
-- Add inventory and cash.
-- Add save schema migration tests.
-- Add first authored neighborhood interiors.
+- [x] Add NPC schedule data and WorldClock integration.
+- [x] Add inventory, item definitions, cash and shop purchases.
+- [x] Upgrade local save schema to v3 with v1/v2 migration support.
+- [x] Persist reputation, NPC relationships and world flags.
+- [x] Add first authored neighborhood interiors (market and apartment).
+- [x] Add apartment rest interaction and time advancement.
+- [ ] Run Godot editor import and runtime validation.
+- [ ] Exercise v1/v2 save migration against real fixture files.
+- [ ] Validate movement, interactions and purchases in browser export.
 
 ## Sprint 4 — Vertical slice
-- Add five distinct NPCs.
-- Add one complete mission with consequences.
-- Add a second encounter variant.
-- Replace placeholder art with original assets.
-- Run browser performance and usability checks.
+- [ ] Add five distinct NPCs with authored dialogue and schedules.
+- [ ] Add one complete mission with multiple outcomes and consequences.
+- [ ] Add a second encounter variant.
+- [ ] Replace placeholder art with original assets.
+- [ ] Run browser performance and usability checks.

@@ -31,12 +31,12 @@ var enemy_hp_bar: ProgressBar
 var stamina_bar: ProgressBar
 
 func _ready() -> void:
+    player_health = clampf(float(GameState.player_health), 1.0, 100.0)
     var bg := ColorRect.new()
     bg.color = Color("#171d29")
     bg.size = ARENA_SIZE
     add_child(bg)
 
-    # Arena floor markings.
     var floor_marks := Node2D.new()
     add_child(floor_marks)
     floor_marks.draw.connect(func() -> void:
@@ -123,7 +123,6 @@ func _process(delta: float) -> void:
     else:
         telegraph.visible = false
 
-    # Blink the player during dodge invulnerability.
     player.modulate = Color(1.0, 1.0, 1.0, 0.45 if invulnerability_timer > 0.0 and int(Time.get_ticks_msec() / 80) % 2 == 0 else 1.0)
     _refresh()
 
@@ -172,6 +171,7 @@ func _resolve_enemy_attack() -> void:
     enemy_recovery = 1.05
     if player.position.distance_to(enemy.position) <= ENEMY_ATTACK_RANGE + 20.0 and invulnerability_timer <= 0.0:
         player_health = maxf(0.0, player_health - ENEMY_DAMAGE)
+        GameState.player_health = int(player_health)
         _set_status("You took a hit. Use SHIFT to dodge the next warning.")
         if player_health <= 0.0:
             _lose_encounter()
@@ -184,7 +184,11 @@ func _win_encounter() -> void:
     GameState.last_combat_won = true
     GameState.mission_active = false
     GameState.mission_completed = true
+    GameState.player_health = maxi(1, int(player_health))
     GameState.player_cash += GameState.mission_reward
+    GameState.adjust_reputation("locals", 5)
+    EventBus.encounter_finished.emit("corner_dispute", "victory")
+    SaveManager.save_game()
     _set_status("VICTORY — +$%d earned. Press ESC to return." % GameState.mission_reward)
     _refresh()
 
@@ -192,6 +196,9 @@ func _lose_encounter() -> void:
     finished = true
     GameState.last_combat_won = false
     GameState.mission_active = false
+    GameState.player_health = 0
+    EventBus.encounter_finished.emit("corner_dispute", "defeat")
+    SaveManager.save_game()
     _set_status("DEFEATED — retreat with no payout. Press ESC to return.")
     _refresh()
 
