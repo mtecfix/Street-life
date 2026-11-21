@@ -124,7 +124,7 @@ func _process(delta: float) -> void:
         telegraph.visible = false
 
     # Blink the player during dodge invulnerability.
-    player.modulate.a = 0.45 if invulnerability_timer > 0.0 and int(Time.get_ticks_msec() / 80) % 2 == 0 else 1.0
+    player.modulate = Color(1.0, 1.0, 1.0, 0.45 if invulnerability_timer > 0.0 and int(Time.get_ticks_msec() / 80) % 2 == 0 else 1.0)
     _refresh()
 
 func _unhandled_input(event: InputEvent) -> void:
