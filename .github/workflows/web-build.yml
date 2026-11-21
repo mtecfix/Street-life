@@ -34,7 +34,7 @@ jobs:
       - name: Export Web
         run: |
           mkdir -p game/build/web
-          godot --headless --path game --export-release "Web" game/build/web/index.html
+          godot --headless --path game --export-release "Web" build/web/index.html
 
       - uses: actions/upload-artifact@v4
         with:
