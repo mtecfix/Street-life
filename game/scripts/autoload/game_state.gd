@@ -1,5 +1,7 @@
 extends Node
 
+const BUILD_MILESTONE := "Sprint 4 — Vertical Slice"
+
 const INVENTORY_CAPACITY := 20
 const ITEM_DEFINITIONS := {
     "snack": {"name": "Corner-store snack", "price": 5, "heal": 15, "description": "A quick bite. Restores 15 health."},
