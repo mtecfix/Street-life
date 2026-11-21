@@ -1,0 +1,23 @@
+name: Godot Web Build
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["game/**", ".github/workflows/web-build.yml"]
+jobs:
+  export-web:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Import project
+        run: godot --headless --path game --editor --quit
+      - name: Export Web
+        run: |
+          mkdir -p game/build/web
+          godot --headless --path game --export-release "Web" game/build/web/index.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: street-hustler-web
+          path: game/build/web/
