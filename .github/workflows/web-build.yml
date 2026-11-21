@@ -9,6 +9,11 @@ concurrency:
   group: street-hustler-web-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   export-web:
     runs-on: ubuntu-latest
@@ -36,7 +41,27 @@ jobs:
           mkdir -p game/build/web
           godot --headless --path game --export-release "Web" build/web/index.html
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload downloadable Web build
+        uses: actions/upload-artifact@v4
         with:
           name: street-hustler-web
           path: game/build/web/
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: game/build/web/
+
+  deploy-pages:
+    needs: export-web
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
