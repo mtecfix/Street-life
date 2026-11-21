@@ -28,6 +28,9 @@ jobs:
       - name: Import project
         run: godot --headless --path game --editor --quit
 
+      - name: Prepare Web export directory
+        run: mkdir -p game/build/web
+
       - name: Export Web
         run: |
           mkdir -p game/build/web
