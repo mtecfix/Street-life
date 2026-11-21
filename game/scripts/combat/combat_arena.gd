@@ -5,6 +5,7 @@ var player_health := 5
 var cooldown := 0.0
 var status: Label
 var stats: Label
+var finished := false
 
 func _ready() -> void:
     var bg := ColorRect.new()
@@ -30,7 +31,7 @@ func _ready() -> void:
 
     var heading := Label.new()
     heading.position = Vector2(24, 70)
-    heading.text = "COMBAT ARENA  |  SPACE: ATTACK  |  ESC: RETREAT"
+    heading.text = "CORNER ENCOUNTER  |  SPACE: ATTACK  |  ESC: RETREAT"
     add_child(heading)
 
     status = Label.new()
@@ -43,12 +44,12 @@ func _process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
     if event.is_action_pressed("ui_cancel"):
-        SceneManager.change_to("res://scenes/world/Neighborhood.tscn")
+        _return_to_neighborhood()
     elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE:
         _attack()
 
 func _attack() -> void:
-    if cooldown > 0.0 or enemy_health <= 0 or player_health <= 0:
+    if finished or cooldown > 0.0 or enemy_health <= 0 or player_health <= 0:
         return
     cooldown = 0.45
     enemy_health -= 1
@@ -56,13 +57,24 @@ func _attack() -> void:
         player_health -= 1
         status.text = "You strike. The opponent counters."
     else:
+        finished = true
         GameState.encounters_won += 1
-        status.text = "Encounter cleared. Press ESC to return."
+        GameState.last_combat_won = true
+        GameState.mission_active = false
+        GameState.mission_completed = true
+        GameState.player_cash += GameState.mission_reward
+        status.text = "Encounter cleared! +$%d. Press ESC to return." % GameState.mission_reward
     _refresh()
 
+func _return_to_neighborhood() -> void:
+    SceneManager.change_to("res://scenes/world/Neighborhood.tscn")
+
 func _refresh() -> void:
-    stats.text = "PLAYER HP: %d    OPPONENT HP: %d" % [player_health, enemy_health]
+    stats.text = "PLAYER HP: %d    OPPONENT HP: %d    CASH: $%d" % [player_health, enemy_health, GameState.player_cash]
     if enemy_health <= 0:
-        status.text = "Encounter cleared. Press ESC to return."
+        status.text = "Encounter cleared! +$%d. Press ESC to return." % GameState.mission_reward
     elif player_health <= 0:
+        finished = true
+        GameState.last_combat_won = false
+        GameState.mission_active = false
         status.text = "You are exhausted. Press ESC to retreat."
