@@ -4,6 +4,7 @@ const NPC_INTERACTION_RANGE := 76.0
 const STORE_DOOR := Vector2(170, 174)
 const APARTMENT_DOOR := Vector2(765, 174)
 const JOB_SITE := Vector2(745, 270)
+const RESIDENT_SHEET := preload("res://assets/sprites/residents.svg")
 
 var status_label: Label
 var hint_label: Label
@@ -12,6 +13,7 @@ var time_label: Label
 var inventory_label: Label
 var npcs: Array[Dictionary] = []
 var _last_schedule_minute := -1
+var mission_choice_pending := false
 
 func _ready() -> void:
     _build_collision()
@@ -28,7 +30,6 @@ func _ready() -> void:
 
 func _draw() -> void:
     draw_rect(Rect2(Vector2.ZERO, Vector2(960, 540)), Color("#202c2b"))
-    # Main road and cross street.
     draw_rect(Rect2(0, 205, 960, 130), Color("#45494c"))
     draw_rect(Rect2(360, 0, 150, 540), Color("#45494c"))
     draw_rect(Rect2(0, 195, 960, 10), Color("#777b78"))
@@ -39,7 +40,6 @@ func _draw() -> void:
         draw_rect(Rect2(380 + i * 18, 210, 9, 28), Color("#d7d0b3"))
         draw_rect(Rect2(380 + i * 18, 302, 9, 28), Color("#d7d0b3"))
 
-    # First authored block: storefront, apartments, homes and alley.
     draw_rect(Rect2(70, 55, 205, 105), Color("#6c594d"))
     draw_rect(Rect2(78, 64, 189, 82), Color("#8b7660"))
     draw_rect(Rect2(650, 55, 230, 105), Color("#5b646b"))
@@ -56,14 +56,13 @@ func _draw() -> void:
     draw_string(ThemeDB.fallback_font, Vector2(670, 120), "APARTMENTS", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#d2e1e7"))
     draw_string(ThemeDB.fallback_font, Vector2(670, 430), "COMMUNITY COURT", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color.WHITE)
 
-    # Active scheduled residents.
     for npc in npcs:
         if not bool(npc["active"]):
             continue
         var npc_position: Vector2 = npc["position"]
-        draw_circle(npc_position, 14, npc["color"])
-        draw_circle(npc_position + Vector2(0, -5), 6, Color("#f0d8b2"))
-        draw_string(ThemeDB.fallback_font, npc_position + Vector2(-25, 31), str(npc["name"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
+        var frame := int(npc["sprite"])
+        draw_texture_rect_region(RESIDENT_SHEET, Rect2(npc_position - Vector2(16, 22), Vector2(32, 40)), Rect2(frame * 32, 0, 32, 40))
+        draw_string(ThemeDB.fallback_font, npc_position + Vector2(-28, 30), str(npc["name"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
 
     draw_circle(JOB_SITE, 20, Color("#d78b43"))
     draw_circle(JOB_SITE, 9, Color("#f3d59b"))
@@ -85,9 +84,11 @@ func _build_collision() -> void:
 
 func _build_npcs() -> void:
     npcs = [
-        {"id": "rico", "name": "RICO", "role": "Fixer", "position": Vector2(590, 270), "color": Color("#d8b45d"), "windows": [[8, 22]], "active": false},
-        {"id": "maya", "name": "MAYA", "role": "Neighbor", "position": Vector2(565, 390), "color": Color("#d88baf"), "windows": [[6, 9], [17, 23]], "active": false},
-        {"id": "dre", "name": "DRE", "role": "Local", "position": Vector2(700, 370), "color": Color("#78b89a"), "windows": [[14, 23]], "active": false}
+        {"id": "rico", "name": "RICO", "role": "Fixer", "position": Vector2(590, 270), "color": Color("#d8b45d"), "sprite": 0, "windows": [[8, 22]], "active": false},
+        {"id": "maya", "name": "MAYA", "role": "Neighbor", "position": Vector2(565, 390), "color": Color("#d88baf"), "sprite": 1, "windows": [[6, 9], [17, 23]], "active": false},
+        {"id": "dre", "name": "DRE", "role": "Local", "position": Vector2(700, 370), "color": Color("#78b89a"), "sprite": 2, "windows": [[14, 23]], "active": false},
+        {"id": "nia", "name": "NIA", "role": "Courier", "position": Vector2(320, 390), "color": Color("#c88b61"), "sprite": 3, "windows": [[7, 16]], "active": false},
+        {"id": "coach", "name": "COACH", "role": "Mentor", "position": Vector2(825, 350), "color": Color("#9a9bd0"), "sprite": 4, "windows": [[6, 11], [16, 20]], "active": false}
     ]
 
 func _build_hud() -> void:
@@ -118,6 +119,15 @@ func _unhandled_input(event: InputEvent) -> void:
         return
     if not event is InputEventKey or not event.pressed or event.echo:
         return
+    if mission_choice_pending:
+        if event.keycode == KEY_1:
+            _start_mission_encounter("corner_brawler")
+        elif event.keycode == KEY_2:
+            _start_mission_encounter("shop_guard")
+        elif event.keycode == KEY_ESCAPE:
+            mission_choice_pending = false
+            dialogue_label.text = "Rico's job is still waiting at the corner."
+        return
     match event.keycode:
         KEY_F:
             _use_consumable("snack")
@@ -144,10 +154,11 @@ func _interact() -> void:
         return
 
     if GameState.mission_active and player_position.distance_to(JOB_SITE) <= NPC_INTERACTION_RANGE:
-        GameState.previous_world_position = player_position
-        GameState.last_combat_won = false
-        EventBus.encounter_started.emit("corner_dispute")
-        SceneManager.change_to("res://scenes/combat/CombatArena.tscn")
+        if GameState.mission_choice.is_empty():
+            mission_choice_pending = true
+            dialogue_label.text = "Choose your approach: 1 STAND YOUR GROUND  |  2 PROTECT THE SHOP  |  ESC CANCEL"
+        else:
+            _start_mission_encounter("corner_brawler" if GameState.mission_choice == "confront" else "shop_guard")
         return
 
     var nearest: Dictionary = {}
@@ -161,28 +172,56 @@ func _interact() -> void:
             nearest = npc
 
     if nearest.is_empty():
-        dialogue_label.text = "Nothing to interact with here. Check the shop, apartments, or find a local."
+        dialogue_label.text = "Nothing nearby. Check the market, apartments, or look for a resident."
         return
 
     var npc_id := str(nearest["id"])
     EventBus.npc_interacted.emit(npc_id)
-    if npc_id == "rico":
-        if not GameState.mission_active and not GameState.mission_completed:
-            GameState.mission_active = true
-            GameState.adjust_relationship("rico", 5)
-            dialogue_label.text = "Rico: A dispute is brewing at the corner. Handle it and come back. The job site is marked."
-        elif GameState.mission_active:
-            dialogue_label.text = "Rico: The corner is still waiting. Keep your guard up and come back after."
-        else:
-            dialogue_label.text = "Rico: Solid work. You got paid, and people noticed. I'll look for another opportunity."
-    elif npc_id == "maya":
-        GameState.adjust_relationship("maya", 2)
-        GameState.adjust_reputation("locals", 1)
-        dialogue_label.text = "Maya: Market's open. Keep some cash for supplies — and don't start trouble near the homes."
-    else:
-        GameState.adjust_relationship("dre", 1)
-        dialogue_label.text = "Dre: The court gets busy after work. If Rico sends you out, watch the wind-up before you swing."
+    match npc_id:
+        "rico":
+            if not GameState.mission_active and not GameState.mission_completed:
+                GameState.mission_active = true
+                GameState.mission_choice = ""
+                GameState.mission_outcome = ""
+                GameState.adjust_relationship("rico", 5)
+                dialogue_label.text = "Rico: Trouble at the corner. Settle it without forgetting who lives here. The site is marked."
+            elif GameState.mission_active:
+                dialogue_label.text = "Rico: Your call. Go to the orange marker and choose how to handle it."
+            else:
+                dialogue_label.text = "Rico: You handled that corner. Dre says there's movement in the alley after dark."
+        "maya":
+            GameState.adjust_relationship("maya", 2)
+            GameState.adjust_reputation("locals", 1)
+            dialogue_label.text = "Maya: Keep the storefront safe and the neighbors will remember. Supplies are inside."
+        "dre":
+            if GameState.mission_completed and not bool(GameState.world_flags.get("alley_encounter_completed", false)):
+                GameState.current_encounter_id = "alley_ambush"
+                GameState.previous_world_position = player_position
+                EventBus.encounter_started.emit("alley_ambush")
+                dialogue_label.text = "Dre: Two guys are cutting through the alley. Don't let them corner you."
+                SaveManager.save_game()
+                SceneManager.change_to("res://scenes/combat/CombatArena.tscn")
+                return
+            GameState.adjust_relationship("dre", 1)
+            dialogue_label.text = "Dre: The court gets busy after work. Watch their feet before they swing."
+        "nia":
+            GameState.adjust_relationship("nia", 2)
+            GameState.adjust_reputation("locals", 1)
+            dialogue_label.text = "Nia: I run packages all over this block. The back alley gets sketchy after sunset."
+        "coach":
+            GameState.adjust_relationship("coach", 2)
+            dialogue_label.text = "Coach: Don't chase every problem. Control your distance, save stamina, and pick your moment."
     SaveManager.save_game()
+
+func _start_mission_encounter(encounter_id: String) -> void:
+    mission_choice_pending = false
+    GameState.mission_choice = "confront" if encounter_id == "corner_brawler" else "protect"
+    GameState.current_encounter_id = encounter_id
+    GameState.previous_world_position = get_node("Player").global_position
+    GameState.last_combat_won = false
+    EventBus.encounter_started.emit(encounter_id)
+    SaveManager.save_game()
+    SceneManager.change_to("res://scenes/combat/CombatArena.tscn")
 
 func _sync_npc_schedules() -> void:
     var hour := WorldClock.get_hour()
@@ -214,13 +253,15 @@ func _refresh_hud() -> void:
     status_label.text = "STREET HUSTLER  |  $%d  |  HEALTH %d/100  |  DAY %d" % [GameState.player_cash, GameState.player_health, GameState.current_day]
     time_label.text = WorldClock.get_time_string()
     inventory_label.text = "BAG %d/%d  |  I: INVENTORY  F: SNACK  H: MEDKIT  |  E: INTERACT" % [GameState.get_inventory_count(), GameState.INVENTORY_CAPACITY]
-    if GameState.mission_completed:
-        hint_label.text = "JOB COMPLETE: Return to Rico for the next lead. Store and apartment doors are marked."
+    if GameState.mission_completed and not bool(GameState.world_flags.get("alley_encounter_completed", false)):
+        hint_label.text = "JOB COMPLETE: Talk to Dre after 2 PM to investigate the alley."
+    elif GameState.mission_completed:
+        hint_label.text = "BLOCK SECURED: Residents know your name. Explore the neighborhood."
     elif GameState.mission_active:
-        hint_label.text = "ACTIVE JOB: Head to the orange corner marker. Visit Maya's Market for supplies."
+        hint_label.text = "ACTIVE JOB: Visit the orange marker and choose your approach."
     else:
-        hint_label.text = "Explore the block. Find Rico during the day, or enter Maya's Market and the walk-ups."
-        
+        hint_label.text = "Meet Rico, Maya, Dre, Nia and Coach. Their schedules change through the day."
+
 func _add_wall(center: Vector2, dimensions: Vector2) -> void:
     var wall := StaticBody2D.new()
     wall.position = center

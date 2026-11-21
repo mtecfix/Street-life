@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="40" viewBox="0 0 160 40" shape-rendering="crispEdges">
+  <rect width="160" height="40" fill="none"/>
+  <g transform="translate(0 0)">
+    <rect x="9" y="2" width="14" height="5" fill="#292b35"/><rect x="7" y="7" width="18" height="8" fill="#a96f4e"/><rect x="10" y="10" width="3" height="2" fill="#241f24"/><rect x="19" y="10" width="3" height="2" fill="#241f24"/><rect x="8" y="16" width="16" height="13" fill="#d1a04f"/><rect x="5" y="18" width="4" height="10" fill="#a96f4e"/><rect x="23" y="18" width="4" height="10" fill="#a96f4e"/><rect x="9" y="29" width="6" height="9" fill="#333b4b"/><rect x="17" y="29" width="6" height="9" fill="#333b4b"/>
+  </g>
+  <g transform="translate(32 0)">
+    <rect x="8" y="2" width="16" height="6" fill="#292331"/><rect x="7" y="7" width="18" height="9" fill="#9c6249"/><rect x="10" y="11" width="3" height="2" fill="#241f24"/><rect x="19" y="11" width="3" height="2" fill="#241f24"/><rect x="7" y="16" width="18" height="13" fill="#b95f8e"/><rect x="4" y="18" width="4" height="10" fill="#9c6249"/><rect x="24" y="18" width="4" height="10" fill="#9c6249"/><rect x="9" y="29" width="6" height="9" fill="#343746"/><rect x="17" y="29" width="6" height="9" fill="#343746"/>
+  </g>
+  <g transform="translate(64 0)">
+    <rect x="8" y="2" width="16" height="5" fill="#20242b"/><rect x="7" y="7" width="18" height="9" fill="#744b3d"/><rect x="10" y="11" width="3" height="2" fill="#17191d"/><rect x="19" y="11" width="3" height="2" fill="#17191d"/><rect x="7" y="16" width="18" height="13" fill="#548d78"/><rect x="4" y="18" width="4" height="10" fill="#744b3d"/><rect x="24" y="18" width="4" height="10" fill="#744b3d"/><rect x="9" y="29" width="6" height="9" fill="#292e38"/><rect x="17" y="29" width="6" height="9" fill="#292e38"/>
+  </g>
+  <g transform="translate(96 0)">
+    <rect x="8" y="2" width="16" height="5" fill="#4a3028"/><rect x="7" y="7" width="18" height="9" fill="#b97c58"/><rect x="10" y="11" width="3" height="2" fill="#241f24"/><rect x="19" y="11" width="3" height="2" fill="#241f24"/><rect x="7" y="16" width="18" height="13" fill="#c47c4f"/><rect x="4" y="18" width="4" height="10" fill="#b97c58"/><rect x="24" y="18" width="4" height="10" fill="#b97c58"/><rect x="9" y="29" width="6" height="9" fill="#344153"/><rect x="17" y="29" width="6" height="9" fill="#344153"/>
+  </g>
+  <g transform="translate(128 0)">
+    <rect x="8" y="2" width="16" height="6" fill="#c1c2c7"/><rect x="7" y="7" width="18" height="9" fill="#8b5d48"/><rect x="10" y="11" width="3" height="2" fill="#241f24"/><rect x="19" y="11" width="3" height="2" fill="#241f24"/><rect x="7" y="16" width="18" height="13" fill="#7778aa"/><rect x="4" y="18" width="4" height="10" fill="#8b5d48"/><rect x="24" y="18" width="4" height="10" fill="#8b5d48"/><rect x="9" y="29" width="6" height="9" fill="#343746"/><rect x="17" y="29" width="6" height="9" fill="#343746"/>
+  </g>
+</svg>

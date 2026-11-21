@@ -28,8 +28,10 @@
 - [ ] Validate movement, interactions and purchases in browser export.
 
 ## Sprint 4 — Vertical slice
-- [ ] Add five distinct NPCs with authored dialogue and schedules.
-- [ ] Add one complete mission with multiple outcomes and consequences.
-- [ ] Add a second encounter variant.
-- [ ] Replace placeholder art with original assets.
+- [x] Add five distinct NPCs with authored dialogue and schedules.
+- [x] Add one complete mission with multiple outcomes and consequences.
+- [x] Add a second encounter variant and an unlockable alley encounter.
+- [x] Add original resident pixel-style art assets.
+- [ ] Run Godot editor import and runtime validation.
+- [ ] Verify mission branches, rewards, and persistent consequences.
 - [ ] Run browser performance and usability checks.

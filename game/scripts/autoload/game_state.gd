@@ -15,9 +15,12 @@ var current_day: int = 1
 var mission_active: bool = false
 var mission_completed: bool = false
 var mission_reward: int = 50
+var mission_choice: String = ""
+var mission_outcome: String = ""
+var current_encounter_id: String = "corner_brawler"
 var last_combat_won: bool = false
 var inventory: Dictionary = {}
-var reputation: Dictionary = {"locals": 0}
+var reputation: Dictionary = {"locals": 0, "rivals": 0}
 var npc_relationships: Dictionary = {}
 var world_flags: Dictionary = {}
 

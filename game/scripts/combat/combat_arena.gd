@@ -2,16 +2,20 @@ extends Node2D
 
 const ARENA_SIZE := Vector2(960, 540)
 const PLAYER_SPEED := 225.0
-const ENEMY_SPEED := 92.0
 const PLAYER_ATTACK_RANGE := 82.0
-const ENEMY_ATTACK_RANGE := 76.0
 const ATTACK_DAMAGE := 25
-const ENEMY_DAMAGE := 18
 const DODGE_COST := 30.0
 const ATTACK_COST := 18.0
 
-var player_health := 100.0
+var enemy_speed := 92.0
+var enemy_attack_range := 76.0
+var enemy_damage := 18.0
+var enemy_windup := 0.78
+var enemy_name := "Corner challenger"
+var enemy_color := Color("#d66a55")
 var enemy_health := 100.0
+var encounter_reward := 50
+var player_health := 100.0
 var stamina := 100.0
 var attack_cooldown := 0.0
 var enemy_recovery := 0.0
@@ -31,6 +35,7 @@ var enemy_hp_bar: ProgressBar
 var stamina_bar: ProgressBar
 
 func _ready() -> void:
+    _configure_encounter()
     player_health = clampf(float(GameState.player_health), 1.0, 100.0)
     var bg := ColorRect.new()
     bg.color = Color("#171d29")
@@ -54,7 +59,7 @@ func _ready() -> void:
 
     enemy = Polygon2D.new()
     enemy.polygon = PackedVector2Array([-18,-22, 18,-22, 24,12, 0,25, -24,12])
-    enemy.color = Color("#d66a55")
+    enemy.color = enemy_color
     enemy.position = Vector2(690, 270)
     add_child(enemy)
 
@@ -70,7 +75,7 @@ func _ready() -> void:
     add_child(stats)
 
     _add_bar("YOUR HEALTH", Vector2(24, 54), player_health, "player")
-    _add_bar("OPPONENT", Vector2(24, 91), enemy_health, "enemy")
+    _add_bar(enemy_name.to_upper(), Vector2(24, 91), enemy_health, "enemy")
     _add_bar("STAMINA", Vector2(24, 128), stamina, "stamina")
 
     var heading := Label.new()
@@ -83,8 +88,38 @@ func _ready() -> void:
     status.position = Vector2(24, 490)
     status.add_theme_font_size_override("font_size", 16)
     add_child(status)
-    _set_status("Close the distance. Watch for the red attack warning.")
+    _set_status("Face %s. Watch for the red attack warning." % enemy_name)
     _refresh()
+
+func _configure_encounter() -> void:
+    match GameState.current_encounter_id:
+        "shop_guard":
+            enemy_name = "Shopfront agitator"
+            enemy_health = 82.0
+            enemy_speed = 118.0
+            enemy_attack_range = 70.0
+            enemy_damage = 14.0
+            enemy_windup = 0.64
+            enemy_color = Color("#c58c4e")
+            encounter_reward = 40
+        "alley_ambush":
+            enemy_name = "Alley runner"
+            enemy_health = 125.0
+            enemy_speed = 138.0
+            enemy_attack_range = 82.0
+            enemy_damage = 22.0
+            enemy_windup = 0.58
+            enemy_color = Color("#9e6bb0")
+            encounter_reward = 35
+        _:
+            enemy_name = "Corner challenger"
+            enemy_health = 100.0
+            enemy_speed = 92.0
+            enemy_attack_range = 76.0
+            enemy_damage = 18.0
+            enemy_windup = 0.78
+            enemy_color = Color("#d66a55")
+            encounter_reward = 50
 
 func _process(delta: float) -> void:
     if finished:
@@ -107,7 +142,7 @@ func _process(delta: float) -> void:
 
     var distance := enemy.position.distance_to(player.position)
     if distance > 61.0:
-        enemy.position = enemy.position.move_toward(player.position, ENEMY_SPEED * delta)
+        enemy.position = enemy.position.move_toward(player.position, enemy_speed * delta)
 
     if telegraph_timer >= 0.0:
         telegraph_timer -= delta
@@ -115,11 +150,11 @@ func _process(delta: float) -> void:
         telegraph.visible = true
         if telegraph_timer <= 0.0:
             _resolve_enemy_attack()
-    elif enemy_recovery <= 0.0 and distance <= ENEMY_ATTACK_RANGE:
-        telegraph_timer = 0.78
+    elif enemy_recovery <= 0.0 and distance <= enemy_attack_range:
+        telegraph_timer = enemy_windup
         telegraph.position = enemy.position
         telegraph.visible = true
-        _set_status("OPPONENT WINDING UP — DODGE NOW!")
+        _set_status("%s winding up — DODGE NOW!" % enemy_name)
     else:
         telegraph.visible = false
 
@@ -169,8 +204,8 @@ func _resolve_enemy_attack() -> void:
     telegraph_timer = -1.0
     telegraph.visible = false
     enemy_recovery = 1.05
-    if player.position.distance_to(enemy.position) <= ENEMY_ATTACK_RANGE + 20.0 and invulnerability_timer <= 0.0:
-        player_health = maxf(0.0, player_health - ENEMY_DAMAGE)
+    if player.position.distance_to(enemy.position) <= enemy_attack_range + 20.0 and invulnerability_timer <= 0.0:
+        player_health = maxf(0.0, player_health - enemy_damage)
         GameState.player_health = int(player_health)
         _set_status("You took a hit. Use SHIFT to dodge the next warning.")
         if player_health <= 0.0:
@@ -182,24 +217,42 @@ func _win_encounter() -> void:
     finished = true
     GameState.encounters_won += 1
     GameState.last_combat_won = true
-    GameState.mission_active = false
-    GameState.mission_completed = true
     GameState.player_health = maxi(1, int(player_health))
-    GameState.player_cash += GameState.mission_reward
-    GameState.adjust_reputation("locals", 5)
-    EventBus.encounter_finished.emit("corner_dispute", "victory")
+    GameState.player_cash += encounter_reward
+    if GameState.current_encounter_id == "alley_ambush":
+        GameState.world_flags["alley_encounter_completed"] = true
+        GameState.adjust_reputation("locals", 3)
+        GameState.mission_outcome = "alley_secured"
+    elif GameState.current_encounter_id == "shop_guard":
+        GameState.mission_active = false
+        GameState.mission_completed = true
+        GameState.mission_outcome = "protected_shop"
+        GameState.adjust_reputation("locals", 7)
+        GameState.adjust_relationship("maya", 3)
+    else:
+        GameState.mission_active = false
+        GameState.mission_completed = true
+        GameState.mission_outcome = "stood_ground"
+        GameState.adjust_reputation("locals", 2)
+        GameState.adjust_reputation("rivals", -2)
+    EventBus.encounter_finished.emit(GameState.current_encounter_id, "victory")
     SaveManager.save_game()
-    _set_status("VICTORY — +$%d earned. Press ESC to return." % GameState.mission_reward)
+    _set_status("VICTORY — +$%d earned. Press ESC to return." % encounter_reward)
     _refresh()
 
 func _lose_encounter() -> void:
     finished = true
     GameState.last_combat_won = false
-    GameState.mission_active = false
     GameState.player_health = 0
-    EventBus.encounter_finished.emit("corner_dispute", "defeat")
+    if GameState.current_encounter_id != "alley_ambush":
+        GameState.mission_active = false
+        GameState.mission_completed = false
+        GameState.mission_choice = ""
+        GameState.mission_outcome = "failed"
+    GameState.adjust_reputation("locals", -3)
+    EventBus.encounter_finished.emit(GameState.current_encounter_id, "defeat")
     SaveManager.save_game()
-    _set_status("DEFEATED — retreat with no payout. Press ESC to return.")
+    _set_status("DEFEATED — no payout. Press ESC to return to the clinic.")
     _refresh()
 
 func _return_to_neighborhood() -> void:
@@ -217,7 +270,7 @@ func _add_bar(caption: String, bar_position: Vector2, initial_value: float, kind
     bar.position = bar_position + Vector2(110, 1)
     bar.size = Vector2(220, 15)
     bar.min_value = 0
-    bar.max_value = 100
+    bar.max_value = 140 if kind == "enemy" and initial_value > 100.0 else 100
     bar.value = initial_value
     bar.show_percentage = false
     add_child(bar)

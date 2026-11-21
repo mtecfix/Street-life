@@ -1,7 +1,7 @@
 extends Node
 
 const SAVE_PATH := "user://savegame.json"
-const SAVE_VERSION := 3
+const SAVE_VERSION := 4
 
 func _notification(what: int) -> void:
     if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_APPLICATION_FOCUS_OUT:
@@ -17,6 +17,8 @@ func save_game() -> Error:
         "world_minutes": WorldClock.total_minutes,
         "mission_active": GameState.mission_active,
         "mission_completed": GameState.mission_completed,
+        "mission_choice": GameState.mission_choice,
+        "mission_outcome": GameState.mission_outcome,
         "previous_world_position": [GameState.previous_world_position.x, GameState.previous_world_position.y],
         "inventory": GameState.inventory.duplicate(true),
         "reputation": GameState.reputation.duplicate(true),
@@ -52,13 +54,15 @@ func load_game() -> Error:
     GameState.current_day = int(WorldClock.total_minutes / 1440) + 1
     GameState.mission_active = bool(data.get("mission_active", false))
     GameState.mission_completed = bool(data.get("mission_completed", false))
+    GameState.mission_choice = str(data.get("mission_choice", ""))
+    GameState.mission_outcome = str(data.get("mission_outcome", ""))
 
     var saved_position: Variant = data.get("previous_world_position", [480.0, 270.0])
     if saved_position is Array and saved_position.size() == 2:
         GameState.previous_world_position = Vector2(float(saved_position[0]), float(saved_position[1]))
 
     _restore_integer_dictionary(GameState.inventory, data.get("inventory", {}), true)
-    _restore_integer_dictionary(GameState.reputation, data.get("reputation", {"locals": 0}), false)
+    _restore_integer_dictionary(GameState.reputation, data.get("reputation", {"locals": 0, "rivals": 0}), false)
     _restore_integer_dictionary(GameState.npc_relationships, data.get("npc_relationships", {}), false)
     var saved_flags: Variant = data.get("world_flags", {})
     if saved_flags is Dictionary:
