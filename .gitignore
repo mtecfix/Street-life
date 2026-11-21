@@ -1,0 +1,9 @@
+.godot/
+.import/
+.export/
+game/build/
+*.translation
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
