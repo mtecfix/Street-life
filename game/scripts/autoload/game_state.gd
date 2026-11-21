@@ -1,6 +1,6 @@
 extends Node
 
-const BUILD_MILESTONE := "Sprint 4 — Vertical Slice"
+const BUILD_MILESTONE := "Sprint 5 — Player Progression & Training"
 
 const INVENTORY_CAPACITY := 20
 const ITEM_DEFINITIONS := {
@@ -12,6 +12,10 @@ const ITEM_DEFINITIONS := {
 var player_cash: int = 25
 var player_health: int = 100
 var encounters_won: int = 0
+var player_xp: int = 0
+var player_level: int = 1
+var skill_points: int = 0
+var skill_levels: Dictionary = {"power": 0, "endurance": 0, "footwork": 0}
 var previous_world_position: Vector2 = Vector2(480, 270)
 var current_day: int = 1
 var mission_active: bool = false
@@ -75,3 +79,45 @@ func adjust_reputation(faction_id: String, amount: int) -> void:
 
 func adjust_relationship(npc_id: String, amount: int) -> void:
     npc_relationships[npc_id] = clampi(int(npc_relationships.get(npc_id, 0)) + amount, -100, 100)
+
+
+func xp_required_for_next_level() -> int:
+    return 100 + (player_level - 1) * 50
+
+func award_experience(amount: int) -> int:
+    if amount <= 0:
+        return 0
+    player_xp += amount
+    var levels_gained := 0
+    while player_xp >= xp_required_for_next_level():
+        player_xp -= xp_required_for_next_level()
+        player_level += 1
+        skill_points += 1
+        levels_gained += 1
+    EventBus.progression_changed.emit(player_level, player_xp, skill_points)
+    return levels_gained
+
+func train_skill(skill_id: String) -> bool:
+    if not skill_levels.has(skill_id) or skill_points <= 0:
+        return false
+    if int(skill_levels[skill_id]) >= 3:
+        return false
+    skill_levels[skill_id] = int(skill_levels[skill_id]) + 1
+    skill_points -= 1
+    EventBus.progression_changed.emit(player_level, player_xp, skill_points)
+    return true
+
+func get_attack_damage() -> int:
+    return 25 + int(skill_levels.get("power", 0)) * 5
+
+func get_max_stamina() -> float:
+    return 100.0 + float(skill_levels.get("endurance", 0)) * 15.0
+
+func get_stamina_regen() -> float:
+    return 14.0 + float(skill_levels.get("endurance", 0)) * 2.0
+
+func get_dodge_cost() -> float:
+    return maxf(18.0, 30.0 - float(skill_levels.get("footwork", 0)) * 4.0)
+
+func get_player_speed() -> float:
+    return 225.0 + float(skill_levels.get("footwork", 0)) * 12.0

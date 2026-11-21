@@ -14,6 +14,7 @@ var inventory_label: Label
 var npcs: Array[Dictionary] = []
 var _last_schedule_minute := -1
 var mission_choice_pending := false
+var training_menu_pending := false
 
 func _ready() -> void:
     _build_collision()
@@ -119,6 +120,17 @@ func _unhandled_input(event: InputEvent) -> void:
         return
     if not event is InputEventKey or not event.pressed or event.echo:
         return
+    if training_menu_pending:
+        if event.keycode == KEY_1:
+            _purchase_training("power")
+        elif event.keycode == KEY_2:
+            _purchase_training("endurance")
+        elif event.keycode == KEY_3:
+            _purchase_training("footwork")
+        elif event.keycode == KEY_ESCAPE:
+            training_menu_pending = false
+            dialogue_label.text = "Coach: Keep at it. We'll work when you're ready."
+        return
     if mission_choice_pending:
         if event.keycode == KEY_1:
             _start_mission_encounter("corner_brawler")
@@ -210,7 +222,8 @@ func _interact() -> void:
             dialogue_label.text = "Nia: I run packages all over this block. The back alley gets sketchy after sunset."
         "coach":
             GameState.adjust_relationship("coach", 2)
-            dialogue_label.text = "Coach: Don't chase every problem. Control your distance, save stamina, and pick your moment."
+            training_menu_pending = true
+            dialogue_label.text = _training_menu_text()
     SaveManager.save_game()
 
 func _start_mission_encounter(encounter_id: String) -> void:
@@ -250,7 +263,7 @@ func _show_inventory() -> void:
 func _refresh_hud() -> void:
     if status_label == null:
         return
-    status_label.text = "STREET HUSTLER  |  $%d  |  HEALTH %d/100  |  DAY %d" % [GameState.player_cash, GameState.player_health, GameState.current_day]
+    status_label.text = "STREET HUSTLER  |  LV %d XP %d/%d SP %d  |  $%d  |  HEALTH %d/100  |  DAY %d" % [GameState.player_level, GameState.player_xp, GameState.xp_required_for_next_level(), GameState.skill_points, GameState.player_cash, GameState.player_health, GameState.current_day]
     time_label.text = WorldClock.get_time_string()
     inventory_label.text = "BAG %d/%d  |  I: INVENTORY  F: SNACK  H: MEDKIT  |  E: INTERACT" % [GameState.get_inventory_count(), GameState.INVENTORY_CAPACITY]
     if GameState.mission_completed and not bool(GameState.world_flags.get("alley_encounter_completed", false)):
@@ -271,3 +284,24 @@ func _add_wall(center: Vector2, dimensions: Vector2) -> void:
     collision.shape = rectangle
     wall.add_child(collision)
     add_child(wall)
+
+
+func _training_menu_text() -> String:
+    return "COACH — SKILL POINTS: %d  |  1 POWER %d/3  |  2 ENDURANCE %d/3  |  3 FOOTWORK %d/3  |  ESC CLOSE" % [
+        GameState.skill_points,
+        int(GameState.skill_levels.get("power", 0)),
+        int(GameState.skill_levels.get("endurance", 0)),
+        int(GameState.skill_levels.get("footwork", 0))
+    ]
+
+func _purchase_training(skill_id: String) -> void:
+    var skill_names := {"power": "POWER", "endurance": "ENDURANCE", "footwork": "FOOTWORK"}
+    if GameState.train_skill(skill_id):
+        dialogue_label.text = "Coach: %s upgraded. Your training is saved." % str(skill_names[skill_id])
+        SaveManager.save_game()
+    else:
+        dialogue_label.text = "Coach: You need a skill point, and each discipline tops out at rank 3."
+    if GameState.skill_points > 0:
+        dialogue_label.text += "  " + _training_menu_text()
+    else:
+        training_menu_pending = false

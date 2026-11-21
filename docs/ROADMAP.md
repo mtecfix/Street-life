@@ -35,3 +35,12 @@
 - [ ] Run Godot editor import and runtime validation.
 - [ ] Verify mission branches, rewards, and persistent consequences.
 - [ ] Run browser performance and usability checks.
+
+
+## Sprint 5 — Player progression and training
+- [x] Add XP rewards and persistent level progression.
+- [x] Grant one skill point per level gained.
+- [x] Add Coach-led Power, Endurance, and Footwork training.
+- [x] Scale combat damage, stamina, dodge cost, and movement from upgrades.
+- [x] Upgrade save schema to v5 with v1-v4 migration defaults.
+- [ ] Validate level-ups, training caps, and save migration in Godot runtime.

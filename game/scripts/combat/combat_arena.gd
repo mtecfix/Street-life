@@ -17,6 +17,7 @@ var enemy_health := 100.0
 var encounter_reward := 50
 var player_health := 100.0
 var stamina := 100.0
+var stamina_max := 100.0
 var attack_cooldown := 0.0
 var enemy_recovery := 0.0
 var telegraph_timer := -1.0
@@ -37,6 +38,8 @@ var stamina_bar: ProgressBar
 func _ready() -> void:
     _configure_encounter()
     player_health = clampf(float(GameState.player_health), 1.0, 100.0)
+    stamina_max = GameState.get_max_stamina()
+    stamina = stamina_max
     var bg := ColorRect.new()
     bg.color = Color("#171d29")
     bg.size = ARENA_SIZE
@@ -128,14 +131,14 @@ func _process(delta: float) -> void:
     attack_cooldown = maxf(0.0, attack_cooldown - delta)
     enemy_recovery = maxf(0.0, enemy_recovery - delta)
     invulnerability_timer = maxf(0.0, invulnerability_timer - delta)
-    stamina = minf(100.0, stamina + 14.0 * delta)
+    stamina = minf(stamina_max, stamina + GameState.get_stamina_regen() * delta)
 
     if dodge_timer > 0.0:
         dodge_timer = maxf(0.0, dodge_timer - delta)
         player.position += dodge_direction * 510.0 * delta
     else:
         var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down")
-        player.position += direction * PLAYER_SPEED * delta
+        player.position += direction * GameState.get_player_speed() * delta
 
     player.position.x = clampf(player.position.x, 38.0, ARENA_SIZE.x - 38.0)
     player.position.y = clampf(player.position.y, 205.0, 445.0)
@@ -178,7 +181,7 @@ func _attack() -> void:
         return
     stamina -= ATTACK_COST
     attack_cooldown = 0.42
-    enemy_health = maxf(0.0, enemy_health - ATTACK_DAMAGE)
+    enemy_health = maxf(0.0, enemy_health - GameState.get_attack_damage())
     enemy.modulate = Color("#ffffff")
     if enemy_health <= 0.0:
         _win_encounter()
@@ -186,7 +189,7 @@ func _attack() -> void:
         _set_status("Clean hit. Keep pressure on the opponent.")
 
 func _dodge() -> void:
-    if finished or dodge_timer > 0.0 or stamina < DODGE_COST:
+    if finished or dodge_timer > 0.0 or stamina < GameState.get_dodge_cost():
         return
     var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down")
     if direction == Vector2.ZERO:
@@ -194,7 +197,7 @@ func _dodge() -> void:
     if direction == Vector2.ZERO:
         direction = Vector2.LEFT
     dodge_direction = direction.normalized()
-    stamina -= DODGE_COST
+    stamina -= GameState.get_dodge_cost()
     dodge_timer = 0.20
     invulnerability_timer = 0.42
     if telegraph_timer >= 0.0:
@@ -216,6 +219,8 @@ func _resolve_enemy_attack() -> void:
 func _win_encounter() -> void:
     finished = true
     GameState.encounters_won += 1
+    var xp_reward := 50 if GameState.current_encounter_id == "corner_brawler" else (45 if GameState.current_encounter_id == "shop_guard" else 65)
+    var levels_gained := GameState.award_experience(xp_reward)
     GameState.last_combat_won = true
     GameState.player_health = maxi(1, int(player_health))
     GameState.player_cash += encounter_reward
@@ -237,7 +242,8 @@ func _win_encounter() -> void:
         GameState.adjust_reputation("rivals", -2)
     EventBus.encounter_finished.emit(GameState.current_encounter_id, "victory")
     SaveManager.save_game()
-    _set_status("VICTORY — +$%d earned. Press ESC to return." % encounter_reward)
+    var progression_message := "  LEVEL UP! +%d skill point(s)." % levels_gained if levels_gained > 0 else ""
+    _set_status("VICTORY — +$%d  +%d XP.%s Press ESC to return." % [encounter_reward, xp_reward, progression_message])
     _refresh()
 
 func _lose_encounter() -> void:
@@ -270,7 +276,7 @@ func _add_bar(caption: String, bar_position: Vector2, initial_value: float, kind
     bar.position = bar_position + Vector2(110, 1)
     bar.size = Vector2(220, 15)
     bar.min_value = 0
-    bar.max_value = 140 if kind == "enemy" and initial_value > 100.0 else 100
+    bar.max_value = 140 if kind == "enemy" and initial_value > 100.0 else (stamina_max if kind == "stamina" else 100)
     bar.value = initial_value
     bar.show_percentage = false
     add_child(bar)
