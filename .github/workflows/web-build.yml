@@ -36,6 +36,19 @@ jobs:
       - name: Run faction standing tests
         run: godot --headless --path game --script res://tests/test_faction_manager.gd
 
+      - name: Run headless tests
+        run: |
+          status=0
+          for test_script in game/tests/test_*.gd; do
+            echo "::group::$test_script"
+            if ! godot --headless --path game --script "res://tests/$(basename "$test_script")"; then
+              echo "::error file=$test_script::Test failed"
+              status=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $status
+
       - name: Prepare Web export directory
         run: mkdir -p game/build/web
 
