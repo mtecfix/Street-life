@@ -66,3 +66,11 @@
 - [x] Scale courier payouts with local standing perks.
 - [x] Add headless standing-boundary tests to CI.
 - [ ] Validate standing progression and courier payouts in interactive browser gameplay.
+
+
+## Sprint 9 — Environment-specific combat scenes
+- [x] Add distinct street-corner, market-front, and alley combat scenes.
+- [x] Route each current encounter to its matching environment.
+- [x] Keep the player's neighborhood return position across the fight transition.
+- [x] Add headless CI checks for combat scene loading and environment identity.
+- [ ] Validate combat transitions and return positioning in interactive gameplay.

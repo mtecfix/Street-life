@@ -39,3 +39,10 @@ Use signals or the EventBus for cross-system notifications. Avoid direct depende
 - Local standing grants a courier cash bonus at known, trusted, and pillar thresholds.
 - The neighborhood HUD displays both faction tiers and numeric reputation; Maya's dialogue reflects local standing.
 - Headless CI tests cover tier boundaries and courier bonus thresholds. Interactive gameplay validation remains outstanding.
+
+
+## Environment-specific combat
+- Combat encounters load a scene styled for the location where the confrontation starts: street corner, market front, or back alley.
+- The encounter's originating neighborhood position remains in GameState and is restored when combat returns to the neighborhood.
+- The shared combat controller keeps the existing health, stamina, enemy telegraph, rewards, and progression behavior across all environment variants.
+- Headless CI checks load each combat scene and verify its environment identity; interactive transition testing remains outstanding.

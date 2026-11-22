@@ -36,6 +36,9 @@ jobs:
       - name: Run faction standing tests
         run: godot --headless --path game --script res://tests/test_faction_manager.gd
 
+      - name: Run combat environment scene tests
+        run: godot --headless --path game --script res://tests/test_combat_scenes.gd
+
       - name: Prepare Web export directory
         run: mkdir -p game/build/web
 

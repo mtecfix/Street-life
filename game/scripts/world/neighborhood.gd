@@ -3,7 +3,7 @@ extends Node2D
 const NPC_INTERACTION_RANGE := 76.0
 const STORE_DOOR := Vector2(170, 174)
 const APARTMENT_DOOR := Vector2(765, 174)
-const JOB_SITE := Vector2(745, 270)
+const JOB_SITE := Vector2(300, 220)
 const RESIDENT_SHEET := preload("res://assets/sprites/residents.svg")
 
 var status_label: Label
@@ -83,7 +83,7 @@ func _draw() -> void:
 
     draw_circle(JOB_SITE, 20, Color("#d78b43"))
     draw_circle(JOB_SITE, 9, Color("#f3d59b"))
-    draw_string(ThemeDB.fallback_font, Vector2(690, 310), "JOB SITE  [E]", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
+    draw_string(ThemeDB.fallback_font, JOB_SITE + Vector2(-48, 38), "CORNER JOB  [E]", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
 
 func _build_collision() -> void:
     _add_wall(Vector2(480, 8), Vector2(960, 16))
@@ -263,7 +263,7 @@ func _interact() -> void:
                 EventBus.encounter_started.emit("alley_ambush")
                 dialogue_label.text = "Dre: Two guys are cutting through the alley. Don't let them corner you."
                 SaveManager.save_game()
-                SceneManager.change_to("res://scenes/combat/CombatArena.tscn")
+                SceneManager.change_to("res://scenes/combat/CombatAlley.tscn")
                 return
             GameState.adjust_relationship("dre", 1)
             dialogue_label.text = "Dre: The court gets busy after work. Watch their feet before they swing."
@@ -292,7 +292,8 @@ func _start_mission_encounter(encounter_id: String) -> void:
     GameState.last_combat_won = false
     EventBus.encounter_started.emit(encounter_id)
     SaveManager.save_game()
-    SceneManager.change_to("res://scenes/combat/CombatArena.tscn")
+    var combat_scene := "res://scenes/combat/CombatShopfront.tscn" if encounter_id == "shop_guard" else "res://scenes/combat/CombatArena.tscn"
+    SceneManager.change_to(combat_scene)
 
 func _sync_npc_schedules() -> void:
     var hour := WorldClock.get_hour()

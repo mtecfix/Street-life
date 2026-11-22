@@ -7,6 +7,8 @@ const ATTACK_DAMAGE := 25
 const DODGE_COST := 30.0
 const ATTACK_COST := 18.0
 
+@export_enum("corner", "shopfront", "alley") var environment_kind: String = "corner"
+
 var enemy_speed := 92.0
 var enemy_attack_range := 76.0
 var enemy_damage := 18.0
@@ -35,24 +37,68 @@ var player_hp_bar: ProgressBar
 var enemy_hp_bar: ProgressBar
 var stamina_bar: ProgressBar
 
+func _draw() -> void:
+    draw_rect(Rect2(Vector2.ZERO, ARENA_SIZE), Color("#171d29"))
+    draw_rect(Rect2(0, 170, 960, 290), Color("#3d4144"))
+    draw_rect(Rect2(0, 170, 960, 18), Color("#777b78"))
+    draw_rect(Rect2(0, 442, 960, 18), Color("#777b78"))
+
+    match environment_kind:
+        "shopfront":
+            draw_rect(Rect2(0, 0, 960, 170), Color("#493c38"))
+            draw_rect(Rect2(78, 24, 804, 128), Color("#806554"))
+            draw_rect(Rect2(110, 55, 230, 75), Color("#29434d"))
+            draw_rect(Rect2(620, 55, 230, 75), Color("#29434d"))
+            draw_rect(Rect2(360, 18, 240, 38), Color("#c18e55"))
+            draw_string(ThemeDB.fallback_font, Vector2(385, 44), "MAYA'S MARKET", HORIZONTAL_ALIGNMENT_LEFT, -1, 21, Color("#fff0ce"))
+            draw_rect(Rect2(62, 214, 86, 72), Color("#59665d"))
+            draw_rect(Rect2(72, 202, 66, 14), Color("#87928a"))
+            draw_rect(Rect2(790, 330, 92, 58), Color("#8b6847"))
+            draw_rect(Rect2(805, 312, 62, 18), Color("#bd9667"))
+            draw_string(ThemeDB.fallback_font, Vector2(28, 495), "STORE FRONT  /  SIDEWALK", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#e7c99d"))
+        "alley":
+            draw_rect(Rect2(0, 0, 190, 540), Color("#493b3a"))
+            draw_rect(Rect2(770, 0, 190, 540), Color("#493b3a"))
+            draw_rect(Rect2(18, 20, 154, 500), Color("#654b45"))
+            draw_rect(Rect2(788, 20, 154, 500), Color("#654b45"))
+            for y in range(45, 500, 34):
+                draw_line(Vector2(20, y), Vector2(170, y), Color("#80645a"), 2.0)
+                draw_line(Vector2(790, y), Vector2(940, y), Color("#80645a"), 2.0)
+            draw_rect(Rect2(34, 220, 126, 112), Color("#46564f"))
+            draw_rect(Rect2(44, 204, 106, 18), Color("#77867b"))
+            draw_rect(Rect2(806, 330, 112, 70), Color("#896744"))
+            draw_rect(Rect2(824, 310, 76, 20), Color("#b18a5b"))
+            draw_line(Vector2(190, 170), Vector2(770, 170), Color("#9b8070"), 5.0)
+            draw_line(Vector2(190, 460), Vector2(770, 460), Color("#9b8070"), 5.0)
+            draw_string(ThemeDB.fallback_font, Vector2(360, 34), "SERVICE ALLEY", HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Color("#e5c8a8"))
+        _:
+            draw_rect(Rect2(0, 0, 960, 170), Color("#45413c"))
+            draw_rect(Rect2(60, 35, 840, 118), Color("#65584d"))
+            draw_rect(Rect2(110, 58, 160, 72), Color("#304650"))
+            draw_rect(Rect2(690, 58, 160, 72), Color("#304650"))
+            draw_rect(Rect2(360, 40, 240, 18), Color("#c18e55"))
+            draw_string(ThemeDB.fallback_font, Vector2(390, 31), "THE CORNER", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color("#f0d7ad"))
+            for x in range(90, 900, 150):
+                draw_rect(Rect2(x, 194, 54, 12), Color("#d6cba8"))
+            draw_rect(Rect2(72, 300, 28, 58), Color("#b64e3d"))
+            draw_rect(Rect2(66, 292, 40, 10), Color("#d98a68"))
+            draw_string(ThemeDB.fallback_font, Vector2(28, 495), "NEIGHBORHOOD STREET CORNER", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#e7c99d"))
+
+func _environment_label() -> String:
+    match environment_kind:
+        "shopfront":
+            return "MAYA'S MARKET FRONT"
+        "alley":
+            return "BACK ALLEY"
+        _:
+            return "STREET CORNER"
+
 func _ready() -> void:
     _configure_encounter()
     player_health = clampf(float(GameState.player_health), 1.0, 100.0)
     stamina_max = GameState.get_max_stamina()
     stamina = stamina_max
-    var bg := ColorRect.new()
-    bg.color = Color("#171d29")
-    bg.size = ARENA_SIZE
-    add_child(bg)
-
-    var floor_marks := Node2D.new()
-    add_child(floor_marks)
-    floor_marks.draw.connect(func() -> void:
-        for x in range(80, 960, 80):
-            floor_marks.draw_line(Vector2(x, 125), Vector2(x, 420), Color(0.25, 0.31, 0.39, 0.35), 1.0)
-        floor_marks.draw_arc(Vector2(480, 270), 115.0, 0.0, TAU, 64, Color(0.32, 0.39, 0.48, 0.6), 2.0)
-    )
-    floor_marks.queue_redraw()
+    queue_redraw()
 
     player = Polygon2D.new()
     player.polygon = PackedVector2Array([-15,-20, 15,-20, 18,10, 0,20, -18,10])
@@ -83,7 +129,7 @@ func _ready() -> void:
 
     var heading := Label.new()
     heading.position = Vector2(24, 166)
-    heading.text = "WASD: MOVE   SPACE: ATTACK   SHIFT: DODGE   ESC: RETREAT"
+    heading.text = "%s  |  WASD: MOVE   SPACE: ATTACK   SHIFT: DODGE   ESC: RETREAT" % _environment_label()
     heading.add_theme_color_override("font_color", Color("#d6dce7"))
     add_child(heading)
 
@@ -140,7 +186,8 @@ func _process(delta: float) -> void:
         var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down")
         player.position += direction * GameState.get_player_speed() * delta
 
-    player.position.x = clampf(player.position.x, 38.0, ARENA_SIZE.x - 38.0)
+    var horizontal_margin := 210.0 if environment_kind == "alley" else 38.0
+    player.position.x = clampf(player.position.x, horizontal_margin, ARENA_SIZE.x - horizontal_margin)
     player.position.y = clampf(player.position.y, 205.0, 445.0)
 
     var distance := enemy.position.distance_to(player.position)
