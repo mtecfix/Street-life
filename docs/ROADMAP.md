@@ -58,3 +58,11 @@
 - [x] Reward cash, XP, local reputation, and Nia relationship.
 - [x] Persist active route and once-per-day completion using world flags.
 - [ ] Validate route selection, delivery completion, and save/reload in Godot runtime.
+
+
+## Sprint 8 — Faction standing and neighborhood trust
+- [x] Add readable standing tiers for locals and rivals.
+- [x] Surface faction standing in the neighborhood HUD and NPC dialogue.
+- [x] Scale courier payouts with local standing perks.
+- [x] Add headless standing-boundary tests to CI.
+- [ ] Validate standing progression and courier payouts in interactive browser gameplay.

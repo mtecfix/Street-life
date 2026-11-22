@@ -32,3 +32,10 @@
 
 ## Event-driven communication
 Use signals or the EventBus for cross-system notifications. Avoid direct dependencies between unrelated systems. Events should carry typed, minimal payloads.
+
+
+## Sprint 8 implementation
+- FactionManager maps local and rival reputation scores to named standing tiers.
+- Local standing grants a courier cash bonus at known, trusted, and pillar thresholds.
+- The neighborhood HUD displays both faction tiers and numeric reputation; Maya's dialogue reflects local standing.
+- Headless CI tests cover tier boundaries and courier bonus thresholds. Interactive gameplay validation remains outstanding.

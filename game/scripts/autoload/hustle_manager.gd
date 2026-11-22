@@ -43,8 +43,11 @@ func complete_active_hustle() -> bool:
     if not HUSTLES.has(hustle_id):
         return false
     var hustle: Dictionary = HUSTLES[hustle_id]
-    GameState.player_cash += int(hustle["cash"])
-    GameState.world_flags["last_hustle_cash"] = int(hustle["cash"])
+    var standing_bonus := FactionManager.get_side_hustle_cash_bonus()
+    var cash_reward := int(hustle["cash"]) + standing_bonus
+    GameState.player_cash += cash_reward
+    GameState.world_flags["last_hustle_cash"] = cash_reward
+    GameState.world_flags["last_hustle_bonus"] = standing_bonus
     GameState.world_flags["last_hustle_xp"] = int(hustle["xp"])
     GameState.award_experience(int(hustle["xp"]))
     GameState.adjust_reputation("locals", int(hustle["locals_rep"]))
@@ -56,7 +59,8 @@ func complete_active_hustle() -> bool:
     return true
 
 func get_completion_message() -> String:
-    return "Nia: Clean delivery. +$%d, +%d XP, +2 local rep, and +2 relationship." % [
+    return "Nia: Clean delivery. +$%d%s, +%d XP, +2 local rep, and +2 relationship." % [
         int(GameState.world_flags.get("last_hustle_cash", 0)),
+        (" (includes +$%d locals standing bonus)" % int(GameState.world_flags.get("last_hustle_bonus", 0))) if int(GameState.world_flags.get("last_hustle_bonus", 0)) > 0 else "",
         int(GameState.world_flags.get("last_hustle_xp", 0))
     ]

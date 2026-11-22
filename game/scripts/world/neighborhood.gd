@@ -11,6 +11,7 @@ var hint_label: Label
 var dialogue_label: Label
 var time_label: Label
 var inventory_label: Label
+var reputation_label: Label
 var npcs: Array[Dictionary] = []
 var _last_schedule_minute := -1
 var mission_choice_pending := false
@@ -112,6 +113,7 @@ func _build_hud() -> void:
     hint_label = _make_label(Vector2(18, 43), 13, Color("#c2ced1"))
     time_label = _make_label(Vector2(790, 14), 15, Color("#f0e7d2"))
     inventory_label = _make_label(Vector2(18, 72), 12, Color("#a9c8c9"))
+    reputation_label = _make_label(Vector2(18, 96), 12, Color("#d6c69a"))
     dialogue_label = _make_label(Vector2(18, 485), 14, Color("#f3d59b"))
 
 func _make_label(label_position: Vector2, font_size: int, font_color: Color) -> Label:
@@ -247,7 +249,13 @@ func _interact() -> void:
         "maya":
             GameState.adjust_relationship("maya", 2)
             GameState.adjust_reputation("locals", 1)
-            dialogue_label.text = "Maya: Keep the storefront safe and the neighbors will remember. Supplies are inside."
+            var local_standing := FactionManager.get_standing_label("locals")
+            if local_standing == "UNWELCOME":
+                dialogue_label.text = "Maya: The block has not forgotten your choices. Show us you can do better."
+            elif local_standing in ["TRUSTED", "PILLAR"]:
+                dialogue_label.text = "Maya: You have earned real trust around here. Supplies are inside."
+            else:
+                dialogue_label.text = "Maya: Keep the storefront safe and the neighbors will remember. Supplies are inside."
         "dre":
             if GameState.mission_completed and not bool(GameState.world_flags.get("alley_encounter_completed", false)):
                 GameState.current_encounter_id = "alley_ambush"
@@ -316,6 +324,7 @@ func _refresh_hud() -> void:
     status_label.text = "STREET HUSTLER  |  LV %d XP %d/%d SP %d  |  $%d  |  HEALTH %d/100  |  DAY %d" % [GameState.player_level, GameState.player_xp, GameState.xp_required_for_next_level(), GameState.skill_points, GameState.player_cash, GameState.player_health, GameState.current_day]
     time_label.text = WorldClock.get_time_string()
     inventory_label.text = "BAG %d/%d  |  I: INVENTORY  F: SNACK  H: MEDKIT  |  E: INTERACT" % [GameState.get_inventory_count(), GameState.INVENTORY_CAPACITY]
+    reputation_label.text = "LOCALS: %s (%+d)  |  RIVALS: %s (%+d)" % [FactionManager.get_standing_label("locals"), int(GameState.reputation.get("locals", 0)), FactionManager.get_standing_label("rivals"), int(GameState.reputation.get("rivals", 0))]
     var active_hustle := HustleManager.get_active_hustle()
     if not active_hustle.is_empty():
         hint_label.text = "COURIER RUN: %s — deliver to the gold marker with E." % str(active_hustle["title"])
@@ -344,7 +353,8 @@ func _add_wall(center: Vector2, dimensions: Vector2) -> void:
 
 
 func _hustle_menu_text() -> String:
-    return "NIA'S COURIER BOARD  |  1 MARKET RUN +$30 / 30 XP  |  2 APARTMENT DROP +$35 / 35 XP  |  ESC CLOSE"
+    var bonus := FactionManager.get_side_hustle_cash_bonus()
+    return "NIA'S COURIER BOARD  |  1 MARKET +$%d / 30 XP  |  2 APARTMENT +$%d / 35 XP  |  ESC CLOSE" % [30 + bonus, 35 + bonus]
 
 func _start_hustle(hustle_id: String) -> void:
     hustle_menu_pending = false

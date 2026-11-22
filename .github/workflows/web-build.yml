@@ -33,6 +33,9 @@ jobs:
       - name: Import project
         run: godot --headless --path game --editor --quit
 
+      - name: Run faction standing tests
+        run: godot --headless --path game --script res://tests/test_faction_manager.gd
+
       - name: Prepare Web export directory
         run: mkdir -p game/build/web
 
