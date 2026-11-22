@@ -51,3 +51,10 @@
 - [x] Persist once-per-day event completion using existing world flags.
 - [x] Surface active events on the neighborhood map and HUD.
 - [ ] Validate event schedules, rewards, and once-per-day persistence in Godot runtime.
+
+## Sprint 7 — Courier side hustles
+- [x] Add two selectable courier routes through Nia.
+- [x] Add destination markers and delivery completion interactions.
+- [x] Reward cash, XP, local reputation, and Nia relationship.
+- [x] Persist active route and once-per-day completion using world flags.
+- [ ] Validate route selection, delivery completion, and save/reload in Godot runtime.

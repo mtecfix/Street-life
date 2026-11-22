@@ -15,6 +15,7 @@ var npcs: Array[Dictionary] = []
 var _last_schedule_minute := -1
 var mission_choice_pending := false
 var training_menu_pending := false
+var hustle_menu_pending := false
 
 func _ready() -> void:
     _build_collision()
@@ -72,6 +73,13 @@ func _draw() -> void:
         draw_arc(event_position, 25.0, 0.0, TAU, 32, Color("#8ee8e6"), 3.0)
         draw_string(ThemeDB.fallback_font, event_position + Vector2(-50, -31), "EVENT  [E]", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#b8f4ec"))
 
+    var active_hustle := HustleManager.get_active_hustle()
+    if not active_hustle.is_empty():
+        var target_position: Vector2 = active_hustle["target_position"]
+        draw_circle(target_position, 20.0, Color(0.95, 0.72, 0.24, 0.22))
+        draw_arc(target_position, 24.0, 0.0, TAU, 32, Color("#f5c65b"), 3.0)
+        draw_string(ThemeDB.fallback_font, target_position + Vector2(-42, -30), "DROP  [E]", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#ffe39b"))
+
     draw_circle(JOB_SITE, 20, Color("#d78b43"))
     draw_circle(JOB_SITE, 9, Color("#f3d59b"))
     draw_string(ThemeDB.fallback_font, Vector2(690, 310), "JOB SITE  [E]", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
@@ -127,6 +135,15 @@ func _unhandled_input(event: InputEvent) -> void:
         return
     if not event is InputEventKey or not event.pressed or event.echo:
         return
+    if hustle_menu_pending:
+        if event.keycode == KEY_1:
+            _start_hustle("market_delivery")
+        elif event.keycode == KEY_2:
+            _start_hustle("apartment_drop")
+        elif event.keycode == KEY_ESCAPE:
+            hustle_menu_pending = false
+            dialogue_label.text = "Nia: Let me know when you're ready to run a package."
+        return
     if training_menu_pending:
         if event.keycode == KEY_1:
             _purchase_training("power")
@@ -162,6 +179,15 @@ func _interact() -> void:
     if player == null:
         return
     var player_position: Vector2 = player.global_position
+
+    var active_hustle := HustleManager.get_active_hustle()
+    if not active_hustle.is_empty() and player_position.distance_to(active_hustle["target_position"]) <= NPC_INTERACTION_RANGE:
+        if HustleManager.complete_active_hustle():
+            dialogue_label.text = HustleManager.get_completion_message()
+            queue_redraw()
+        else:
+            dialogue_label.text = "That delivery is no longer active."
+        return
 
     var active_event := EventManager.get_active_event()
     if not active_event.is_empty() and player_position.distance_to(active_event["position"]) <= NPC_INTERACTION_RANGE:
@@ -236,7 +262,14 @@ func _interact() -> void:
         "nia":
             GameState.adjust_relationship("nia", 2)
             GameState.adjust_reputation("locals", 1)
-            dialogue_label.text = "Nia: I run packages all over this block. The back alley gets sketchy after sunset."
+            if HustleManager.can_start_hustle():
+                hustle_menu_pending = true
+                dialogue_label.text = _hustle_menu_text()
+            elif not HustleManager.get_active_hustle().is_empty():
+                var active := HustleManager.get_active_hustle()
+                dialogue_label.text = "Nia: Finish the %s. The drop is marked in gold." % str(active["title"])
+            else:
+                dialogue_label.text = "Nia: You already ran a package today. Come back tomorrow for another route."
         "coach":
             GameState.adjust_relationship("coach", 2)
             training_menu_pending = true
@@ -283,9 +316,13 @@ func _refresh_hud() -> void:
     status_label.text = "STREET HUSTLER  |  LV %d XP %d/%d SP %d  |  $%d  |  HEALTH %d/100  |  DAY %d" % [GameState.player_level, GameState.player_xp, GameState.xp_required_for_next_level(), GameState.skill_points, GameState.player_cash, GameState.player_health, GameState.current_day]
     time_label.text = WorldClock.get_time_string()
     inventory_label.text = "BAG %d/%d  |  I: INVENTORY  F: SNACK  H: MEDKIT  |  E: INTERACT" % [GameState.get_inventory_count(), GameState.INVENTORY_CAPACITY]
-    var active_event := EventManager.get_active_event()
-    if not active_event.is_empty():
-        hint_label.text = "EVENT: %s — %s" % [str(active_event["title"]), str(active_event["hours"])]
+    var active_hustle := HustleManager.get_active_hustle()
+    if not active_hustle.is_empty():
+        hint_label.text = "COURIER RUN: %s — deliver to the gold marker with E." % str(active_hustle["title"])
+    else:
+        var active_event := EventManager.get_active_event()
+        if not active_event.is_empty():
+            hint_label.text = "EVENT: %s — %s" % [str(active_event["title"]), str(active_event["hours"])]
     elif GameState.mission_completed and not bool(GameState.world_flags.get("alley_encounter_completed", false)):
         hint_label.text = "JOB COMPLETE: Talk to Dre after 2 PM to investigate the alley."
     elif GameState.mission_completed:
@@ -305,6 +342,18 @@ func _add_wall(center: Vector2, dimensions: Vector2) -> void:
     wall.add_child(collision)
     add_child(wall)
 
+
+func _hustle_menu_text() -> String:
+    return "NIA'S COURIER BOARD  |  1 MARKET RUN +$30 / 30 XP  |  2 APARTMENT DROP +$35 / 35 XP  |  ESC CLOSE"
+
+func _start_hustle(hustle_id: String) -> void:
+    hustle_menu_pending = false
+    if HustleManager.start_hustle(hustle_id):
+        var active := HustleManager.get_active_hustle()
+        dialogue_label.text = "Nia: Package is ready. Take it to %s — follow the gold marker." % str(active["destination"])
+        queue_redraw()
+    else:
+        dialogue_label.text = "Nia: No more routes today. Come back tomorrow."
 
 func _training_menu_text() -> String:
     return "COACH — SKILL POINTS: %d  |  1 POWER %d/3  |  2 ENDURANCE %d/3  |  3 FOOTWORK %d/3  |  ESC CLOSE" % [
