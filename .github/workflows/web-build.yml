@@ -42,6 +42,15 @@ jobs:
       - name: Run combat attack rules tests
         run: godot --headless --path game --script res://tests/test_combat_rules.gd
 
+      - name: Run progression and save migration tests
+        run: godot --headless --path game --script res://tests/test_progression.gd
+
+      - name: Run world clock, event, and side hustle tests
+        run: godot --headless --path game --script res://tests/test_world_systems.gd
+
+      - name: Run debug bridge snapshot tests
+        run: godot --headless --path game --script res://tests/test_debug_bridge.gd
+
       - name: Prepare Web export directory
         run: mkdir -p game/build/web
 
