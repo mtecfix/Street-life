@@ -65,6 +65,13 @@ func _draw() -> void:
         draw_texture_rect_region(RESIDENT_SHEET, Rect2(npc_position - Vector2(16, 22), Vector2(32, 40)), Rect2(frame * 32, 0, 32, 40))
         draw_string(ThemeDB.fallback_font, npc_position + Vector2(-28, 30), str(npc["name"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color.WHITE)
 
+    var active_event := EventManager.get_active_event()
+    if not active_event.is_empty():
+        var event_position: Vector2 = active_event["position"]
+        draw_circle(event_position, 22.0, Color(0.18, 0.78, 0.82, 0.25))
+        draw_arc(event_position, 25.0, 0.0, TAU, 32, Color("#8ee8e6"), 3.0)
+        draw_string(ThemeDB.fallback_font, event_position + Vector2(-50, -31), "EVENT  [E]", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color("#b8f4ec"))
+
     draw_circle(JOB_SITE, 20, Color("#d78b43"))
     draw_circle(JOB_SITE, 9, Color("#f3d59b"))
     draw_string(ThemeDB.fallback_font, Vector2(690, 310), "JOB SITE  [E]", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
@@ -155,6 +162,16 @@ func _interact() -> void:
     if player == null:
         return
     var player_position: Vector2 = player.global_position
+
+    var active_event := EventManager.get_active_event()
+    if not active_event.is_empty() and player_position.distance_to(active_event["position"]) <= NPC_INTERACTION_RANGE:
+        var event_id := str(active_event["id"])
+        if EventManager.complete_active_event(event_id):
+            dialogue_label.text = EventManager.get_completion_message(event_id)
+            queue_redraw()
+        else:
+            dialogue_label.text = "That neighborhood event has already passed."
+        return
 
     if player_position.distance_to(STORE_DOOR) <= NPC_INTERACTION_RANGE:
         GameState.previous_world_position = player_position
@@ -266,7 +283,10 @@ func _refresh_hud() -> void:
     status_label.text = "STREET HUSTLER  |  LV %d XP %d/%d SP %d  |  $%d  |  HEALTH %d/100  |  DAY %d" % [GameState.player_level, GameState.player_xp, GameState.xp_required_for_next_level(), GameState.skill_points, GameState.player_cash, GameState.player_health, GameState.current_day]
     time_label.text = WorldClock.get_time_string()
     inventory_label.text = "BAG %d/%d  |  I: INVENTORY  F: SNACK  H: MEDKIT  |  E: INTERACT" % [GameState.get_inventory_count(), GameState.INVENTORY_CAPACITY]
-    if GameState.mission_completed and not bool(GameState.world_flags.get("alley_encounter_completed", false)):
+    var active_event := EventManager.get_active_event()
+    if not active_event.is_empty():
+        hint_label.text = "EVENT: %s — %s" % [str(active_event["title"]), str(active_event["hours"])]
+    elif GameState.mission_completed and not bool(GameState.world_flags.get("alley_encounter_completed", false)):
         hint_label.text = "JOB COMPLETE: Talk to Dre after 2 PM to investigate the alley."
     elif GameState.mission_completed:
         hint_label.text = "BLOCK SECURED: Residents know your name. Explore the neighborhood."

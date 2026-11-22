@@ -44,3 +44,10 @@
 - [x] Scale combat damage, stamina, dodge cost, and movement from upgrades.
 - [x] Upgrade save schema to v5 with v1-v4 migration defaults.
 - [ ] Validate level-ups, training caps, and save migration in Godot runtime.
+
+## Sprint 6 — Dynamic neighborhood events
+- [x] Add three scheduled, repeatable neighborhood events.
+- [x] Add event rewards tied to cash, XP, reputation, and relationships.
+- [x] Persist once-per-day event completion using existing world flags.
+- [x] Surface active events on the neighborhood map and HUD.
+- [ ] Validate event schedules, rewards, and once-per-day persistence in Godot runtime.
