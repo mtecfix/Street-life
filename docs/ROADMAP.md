@@ -74,3 +74,11 @@
 - [x] Keep the player's neighborhood return position across the fight transition.
 - [x] Add headless CI checks for combat scene loading and environment identity.
 - [ ] Validate combat transitions and return positioning in interactive gameplay.
+
+
+## Sprint 10 — Combat depth: combos and heavy strikes
+- [x] Add a three-hit light-attack combo with increasing damage.
+- [x] Add a stamina-intensive heavy strike.
+- [x] Allow a heavy strike to interrupt an enemy's telegraphed attack.
+- [x] Add headless tests for combo and heavy-strike damage scaling.
+- [ ] Validate attack timing, stamina balance, and enemy interruption in interactive gameplay.

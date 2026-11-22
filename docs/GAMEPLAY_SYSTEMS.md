@@ -46,3 +46,11 @@ Use signals or the EventBus for cross-system notifications. Avoid direct depende
 - The encounter's originating neighborhood position remains in GameState and is restored when combat returns to the neighborhood.
 - The shared combat controller keeps the existing health, stamina, enemy telegraph, rewards, and progression behavior across all environment variants.
 - Headless CI checks load each combat scene and verify its environment identity; interactive transition testing remains outstanding.
+
+
+## Sprint 10 — Combat attack system
+- Space chains up to three light attacks while the combo window remains open; successive hits scale damage.
+- Q performs a heavier strike that costs more stamina and deals increased damage.
+- A heavy strike that lands during an enemy windup cancels that telegraphed attack and creates a short enemy recovery window.
+- The existing attack cooldown, stamina regeneration, player skill damage scaling, dodge, rewards, and encounter lifecycle remain in place.
+- CI checks the damage formulas; combat feel and balance still require interactive playtesting.

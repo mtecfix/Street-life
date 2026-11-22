@@ -6,6 +6,7 @@ const PLAYER_ATTACK_RANGE := 82.0
 const ATTACK_DAMAGE := 25
 const DODGE_COST := 30.0
 const ATTACK_COST := 18.0
+const HEAVY_ATTACK_COST := 36.0
 
 @export_enum("corner", "shopfront", "alley") var environment_kind: String = "corner"
 
@@ -21,6 +22,8 @@ var player_health := 100.0
 var stamina := 100.0
 var stamina_max := 100.0
 var attack_cooldown := 0.0
+var combo_step := 0
+var combo_window_timer := 0.0
 var enemy_recovery := 0.0
 var telegraph_timer := -1.0
 var dodge_timer := 0.0
@@ -129,7 +132,7 @@ func _ready() -> void:
 
     var heading := Label.new()
     heading.position = Vector2(24, 166)
-    heading.text = "%s  |  WASD: MOVE   SPACE: ATTACK   SHIFT: DODGE   ESC: RETREAT" % _environment_label()
+    heading.text = "%s  |  WASD: MOVE   SPACE: COMBO   Q: HEAVY   SHIFT: DODGE   ESC: RETREAT" % _environment_label()
     heading.add_theme_color_override("font_color", Color("#d6dce7"))
     add_child(heading)
 
@@ -175,6 +178,9 @@ func _process(delta: float) -> void:
         return
 
     attack_cooldown = maxf(0.0, attack_cooldown - delta)
+    combo_window_timer = maxf(0.0, combo_window_timer - delta)
+    if combo_window_timer <= 0.0:
+        combo_step = 0
     enemy_recovery = maxf(0.0, enemy_recovery - delta)
     invulnerability_timer = maxf(0.0, invulnerability_timer - delta)
     stamina = minf(stamina_max, stamina + GameState.get_stamina_regen() * delta)
@@ -217,6 +223,8 @@ func _unhandled_input(event: InputEvent) -> void:
     elif event is InputEventKey and event.pressed and not event.echo:
         if event.keycode == KEY_SPACE:
             _attack()
+        elif event.keycode == KEY_Q:
+            _heavy_attack()
         elif event.keycode == KEY_SHIFT:
             _dodge()
 
@@ -226,14 +234,54 @@ func _attack() -> void:
     if player.position.distance_to(enemy.position) > PLAYER_ATTACK_RANGE:
         _set_status("Too far away. Move closer before attacking.")
         return
+
+    var damage := get_combo_damage(GameState.get_attack_damage(), combo_step)
     stamina -= ATTACK_COST
     attack_cooldown = 0.42
-    enemy_health = maxf(0.0, enemy_health - GameState.get_attack_damage())
+    combo_step = (combo_step + 1) % 3
+    combo_window_timer = 0.85
+    enemy_health = maxf(0.0, enemy_health - damage)
     enemy.modulate = Color("#ffffff")
     if enemy_health <= 0.0:
         _win_encounter()
     else:
-        _set_status("Clean hit. Keep pressure on the opponent.")
+        var combo_label := "3-HIT COMBO!" if combo_step == 0 else "COMBO %d/3" % combo_step
+        _set_status("%s — %d damage. Press Q for a heavy strike." % [combo_label, damage])
+
+func _heavy_attack() -> void:
+    if finished or attack_cooldown > 0.0 or stamina < HEAVY_ATTACK_COST:
+        return
+    if player.position.distance_to(enemy.position) > PLAYER_ATTACK_RANGE:
+        _set_status("Heavy strike out of range. Move closer.")
+        return
+
+    stamina -= HEAVY_ATTACK_COST
+    attack_cooldown = 0.78
+    combo_step = 0
+    combo_window_timer = 0.0
+    var damage := get_heavy_attack_damage(GameState.get_attack_damage())
+    enemy_health = maxf(0.0, enemy_health - damage)
+    enemy.modulate = Color("#ffffff")
+
+    var interrupted := telegraph_timer >= 0.0
+    if interrupted:
+        telegraph_timer = -1.0
+        telegraph.visible = false
+        enemy_recovery = 0.85
+
+    if enemy_health <= 0.0:
+        _win_encounter()
+    elif interrupted:
+        _set_status("HEAVY HIT — %d damage. You interrupted the incoming strike!" % damage)
+    else:
+        _set_status("HEAVY HIT — %d damage. Recover your stamina." % damage)
+
+func get_combo_damage(base_damage: int, combo_index: int) -> int:
+    var multipliers := [1.0, 1.15, 1.35]
+    return roundi(float(base_damage) * float(multipliers[clampi(combo_index, 0, 2)]))
+
+func get_heavy_attack_damage(base_damage: int) -> int:
+    return roundi(float(base_damage) * 1.8)
 
 func _dodge() -> void:
     if finished or dodge_timer > 0.0 or stamina < GameState.get_dodge_cost():
