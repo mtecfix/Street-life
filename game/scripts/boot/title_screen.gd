@@ -7,9 +7,13 @@ extends Control
 # separate from the world scene so that the player can choose whether to start
 # a fresh session or resume a locally saved one before entering the neighborhood.
 #
-# The visual background is drawn procedurally in _draw(), while the menu itself
-# is made from native Godot Controls. Keeping the buttons as real Controls
-# preserves keyboard/controller focus, accessibility, and reliable input.
+# The visual background is the original title-screen artwork documented in
+# "IMAGES DOWNLOAD.md" (res://assets/sprites/title_screen_bg.png), displayed
+# full-screen behind the menu. A translucent overlay is layered on top so the
+# foreground menu remains the clearest visual and interactive focal point.
+# The menu itself is made from native Godot Controls. Keeping the buttons as
+# real Controls preserves keyboard/controller focus, accessibility, and
+# reliable input.
 #
 # IMPORTANT: This screen does not implement save serialization or world
 # initialization itself. It delegates those responsibilities to SaveManager
@@ -18,53 +22,39 @@ extends Control
 # The first playable world scene entered by both menu actions.
 const WORLD_SCENE := "res://scenes/world/Neighborhood.tscn"
 
+# Original title-screen artwork. Kept as a constant path so the single
+# background asset is easy to locate and swap without touching layout logic.
+const BACKGROUND_IMAGE := "res://assets/sprites/title_screen_bg.png"
+
 # Retain the Continue button so its initial state can be set from save-file
 # availability when the menu is assembled.
 var _continue_button: Button
 
 # Called by Godot when the title-screen Control enters the scene tree.
-# Build the interactive menu once, then request a redraw of the background.
+# Build the background first so the menu layers on top of it, then build
+# the interactive menu itself.
 func _ready() -> void:
+    _build_background()
     _build_menu()
-    queue_redraw()
 
-# Draw the atmospheric backdrop behind the menu.
-# All coordinates are derived from the current viewport size so the artwork
-# scales with the game's window rather than relying on a fixed resolution.
-func _draw() -> void:
-    var size := get_viewport_rect().size
-
-    # Establish the dark base color used across the title-screen palette.
-    draw_rect(Rect2(Vector2.ZERO, size), Color("#080d12"))
-
-    # Ground plane and distant building silhouettes create a simple,
-    # original Bronx-inspired skyline without depending on external assets.
-    draw_rect(Rect2(0, size.y * 0.60, size.x, size.y * 0.40), Color("#111b20"))
-    for i in range(12):
-        # Deterministic variation gives each building a different width and
-        # height while keeping the skyline stable between redraws.
-        var building_width := 42.0 + float((i * 17) % 35)
-        var building_height := 95.0 + float((i * 31) % 125)
-        var x := float(i) * size.x / 11.0 - 20.0
-        var y := size.y * 0.60 - building_height
-        draw_rect(Rect2(x, y, building_width, building_height), Color("#14232a"))
-
-        # Small warm window lights add scale and life to the otherwise dark
-        # silhouettes. Their positions are calculated relative to each building.
-        for row in range(3):
-            for col in range(2):
-                var wx := x + 10.0 + float(col) * 18.0
-                var wy := y + 14.0 + float(row) * 24.0
-                draw_rect(Rect2(wx, wy, 6, 9), Color("#b58b45", 0.55))
-
-    # A restrained neon-green horizon accent ties the background into the
-    # game's title-screen color palette.
-    draw_rect(Rect2(0, size.y * 0.60, size.x, 3), Color("#39e66b", 0.8))
-    draw_rect(Rect2(0, size.y * 0.60 + 5, size.x, 1), Color("#39e66b", 0.22))
+# Construct the full-screen artwork backdrop behind the menu.
+# A TextureRect keeps the image as a real, inspectable scene node rather than
+# a hand-drawn canvas, and STRETCH_KEEP_ASPECT_COVERED fills the viewport at
+# any window size without distorting the artwork's original proportions.
+func _build_background() -> void:
+    var background := TextureRect.new()
+    background.texture = load(BACKGROUND_IMAGE)
+    background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+    add_child(background)
 
     # Dark translucent overlay reduces background contrast so the foreground
-    # menu remains the clearest visual and interactive focal point.
-    draw_rect(Rect2(0, 0, size.x, size.y), Color(0.01, 0.025, 0.035, 0.35))
+    # menu remains legible and the clearest visual and interactive focal point.
+    var overlay := ColorRect.new()
+    overlay.color = Color(0.01, 0.025, 0.035, 0.45)
+    overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    add_child(overlay)
 
 # Construct the complete menu hierarchy in code.
 # The hierarchy is CenterContainer > PanelContainer > VBoxContainer. This keeps
