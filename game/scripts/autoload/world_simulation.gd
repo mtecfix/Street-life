@@ -241,6 +241,22 @@ func get_business_snapshot(business_id: String) -> Dictionary:
         "employee_name": "Tasha"
     }
 
+func has_business_stock(business_id: String, item_id: String) -> bool:
+    var snapshot := get_business_snapshot(business_id)
+    var stock: Dictionary = snapshot.get("stock", {})
+    return int(stock.get(item_id, 0)) > 0
+
+func record_business_sale(business_id: String, item_id: String) -> void:
+    if not BUSINESSES.has(business_id):
+        return
+    var city_state: Dictionary = GameState.world_flags.get("city_simulation", {}).duplicate(true)
+    var business_state: Dictionary = city_state.get(business_id, {}).duplicate(true)
+    var stock: Dictionary = business_state.get("stock", {}).duplicate(true)
+    stock[item_id] = maxi(0, int(stock.get(item_id, 0)) - 1)
+    business_state["stock"] = stock
+    city_state[business_id] = business_state
+    GameState.world_flags["city_simulation"] = city_state
+
 func get_city_activity_level() -> int:
     var hour := WorldClock.get_hour()
     if hour >= 16 and hour < 21:
