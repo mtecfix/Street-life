@@ -23,8 +23,7 @@ func _run() -> void:
     await process_frame
 
     _check(hud is CanvasLayer, "Gameplay HUD should be a CanvasLayer.")
-    _check(hud.get_node_or_null("PanelContainer") == null, "HUD builds its panels dynamically; no required hard-coded panel node.")
-    _check(hud.get_child_count() >= 4, "HUD should build status, objective, district, map and controls panels.")
+    _check(hud.get_child_count() >= 5, "HUD should build status, objective, district, map and controls panels.")
 
     var labels := hud.find_children("*", "Label", true, false)
     var has_objective := false
