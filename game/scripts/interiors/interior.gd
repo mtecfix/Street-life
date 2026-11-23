@@ -9,6 +9,9 @@ const EXIT_POSITION := Vector2(480, 490)
 var player: CharacterBody2D
 var status_label: Label
 var detail_label: Label
+var shop_panel: PanelContainer
+var shop_summary: Label
+var shop_buttons: Dictionary = {}
 
 func _ready() -> void:
     player = get_node_or_null("Player")
@@ -17,6 +20,9 @@ func _ready() -> void:
     status_label = _make_label(Vector2(28, 24), 18, Color("#f2e8d5"))
     detail_label = _make_label(Vector2(28, 58), 13, Color("#c4d2d4"))
     _refresh_text()
+    if interior_kind == "shop":
+        _build_shop_interface()
+        _refresh_shop_interface()
     queue_redraw()
 
 func _draw() -> void:
@@ -77,14 +83,15 @@ func _purchase(item_id: String) -> void:
         # Do not emit here as well, or HUD listeners receive duplicate events.
         SaveManager.save_game()
     else:
-        status_label.text = "Can't buy that. Check your cash and bag capacity."
+        status_label.text = _purchase_failure_reason(item_id)
+    _refresh_shop_interface()
 
 func _exit_interior() -> void:
     SceneManager.change_to("res://scenes/world/Neighborhood.tscn")
 
 func _refresh_text() -> void:
     if interior_kind == "shop":
-        detail_label.text = "1  SNACK  $5  (+15 HP)     2  FIRST-AID KIT  $18  (+45 HP)     3  SODA  $8  (+5 HP)     ESC: EXIT"
+        detail_label.text = "Choose an item below or press 1, 2, or 3. ESC: EXIT"
     else:
         detail_label.text = "Move to the bed and press E to rest for eight hours. Health is fully restored. Move to the bottom door and press E to leave."
 
@@ -95,3 +102,73 @@ func _make_label(label_position: Vector2, font_size: int, font_color: Color) -> 
     label.add_theme_color_override("font_color", font_color)
     add_child(label)
     return label
+
+func _build_shop_interface() -> void:
+    # A Control-based checkout keeps the shop usable with mouse, touch, and
+    # keyboard. The same _purchase path is used by buttons and legacy hotkeys.
+    shop_panel = PanelContainer.new()
+    shop_panel.name = "ShopCheckout"
+    shop_panel.position = Vector2(245, 185)
+    shop_panel.custom_minimum_size = Vector2(470, 150)
+    var panel_style := StyleBoxFlat.new()
+    panel_style.bg_color = Color("#182126")
+    panel_style.border_color = Color("#d4b77b")
+    panel_style.set_border_width_all(2)
+    panel_style.set_corner_radius_all(8)
+    panel_style.set_content_margin_all(14)
+    shop_panel.add_theme_stylebox_override("panel", panel_style)
+    add_child(shop_panel)
+
+    var content := VBoxContainer.new()
+    content.add_theme_constant_override("separation", 8)
+    shop_panel.add_child(content)
+
+    shop_summary = Label.new()
+    shop_summary.add_theme_color_override("font_color", Color("#f2e8d5"))
+    shop_summary.add_theme_font_size_override("font_size", 14)
+    content.add_child(shop_summary)
+
+    for item_id in SHOP_ITEMS:
+        var item: Dictionary = GameState.ITEM_DEFINITIONS[item_id]
+        var row := HBoxContainer.new()
+        row.add_theme_constant_override("separation", 8)
+        content.add_child(row)
+
+        var description := Label.new()
+        description.text = "%s  —  $%d  —  +%d HP" % [
+            str(item["name"]), int(item["price"]), int(item["heal"])
+        ]
+        description.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        description.add_theme_color_override("font_color", Color("#d7e0dc"))
+        row.add_child(description)
+
+        var buy_button := Button.new()
+        buy_button.text = "BUY"
+        buy_button.custom_minimum_size.x = 82
+        buy_button.pressed.connect(_purchase.bind(item_id))
+        row.add_child(buy_button)
+        shop_buttons[item_id] = buy_button
+
+func _refresh_shop_interface() -> void:
+    if not is_instance_valid(shop_summary):
+        return
+    shop_summary.text = "CASH  $%d     BAG  %d/%d" % [
+        GameState.player_cash,
+        GameState.get_inventory_count(),
+        GameState.INVENTORY_CAPACITY
+    ]
+    for item_id in shop_buttons:
+        var item: Dictionary = GameState.ITEM_DEFINITIONS[item_id]
+        var can_afford := GameState.player_cash >= int(item["price"])
+        var has_space := GameState.get_inventory_count() < GameState.INVENTORY_CAPACITY
+        shop_buttons[item_id].disabled = not can_afford or not has_space
+
+func _purchase_failure_reason(item_id: String) -> String:
+    var item: Dictionary = GameState.ITEM_DEFINITIONS[item_id]
+    if GameState.get_inventory_count() >= GameState.INVENTORY_CAPACITY:
+        return "Your bag is full. Use an item or make room before buying."
+    if GameState.player_cash < int(item["price"]):
+        return "Not enough cash for %s. You need $%d." % [
+            str(item["name"]), int(item["price"])
+        ]
+    return "That purchase could not be completed."

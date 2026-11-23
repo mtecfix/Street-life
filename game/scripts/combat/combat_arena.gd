@@ -14,6 +14,14 @@ var enemy_speed := 92.0
 var enemy_attack_range := 76.0
 var enemy_damage := 18.0
 var enemy_windup := 0.78
+# Each encounter gets a readable AI archetype rather than identical chase-and-swing logic.
+var enemy_style := "pressure"
+var enemy_decision_timer := 0.0
+var enemy_orbit_direction := 1.0
+var enemy_attack_cooldown_timer := 0.0
+var enemy_attack_sequence := 0
+var enemy_attack_kind := "quick"
+var enemy_feint_active := false
 var enemy_name := "Corner challenger"
 var enemy_color := Color("#d66a55")
 var enemy_health := 100.0
@@ -25,6 +33,16 @@ var attack_cooldown := 0.0
 var combo_step := 0
 var combo_window_timer := 0.0
 var enemy_recovery := 0.0
+var enemy_hitstun_timer := 0.0
+var enemy_knockback_velocity := Vector2.ZERO
+var player_knockback_velocity := Vector2.ZERO
+var hit_flash_timer := 0.0
+var player_hit_flash_timer := 0.0
+var player_swing_timer := 0.0
+var player_swing_duration := 0.18
+var enemy_swing_timer := 0.0
+var enemy_swing_duration := 0.24
+var enemy_recoil_timer := 0.0
 var telegraph_timer := -1.0
 var dodge_timer := 0.0
 var invulnerability_timer := 0.0
@@ -39,6 +57,8 @@ var status: Label
 var player_hp_bar: ProgressBar
 var enemy_hp_bar: ProgressBar
 var stamina_bar: ProgressBar
+# Breakable props anchor combat to the environment instead of a generic arena.
+var environment_props: Array[Dictionary] = []
 
 func _draw() -> void:
     draw_rect(Rect2(Vector2.ZERO, ARENA_SIZE), Color("#171d29"))
@@ -87,6 +107,30 @@ func _draw() -> void:
             draw_rect(Rect2(66, 292, 40, 10), Color("#d98a68"))
             draw_string(ThemeDB.fallback_font, Vector2(28, 495), "NEIGHBORHOOD STREET CORNER", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#e7c99d"))
 
+    # Draw the location-specific props after the fixed environment art.
+    for prop in environment_props:
+        if int(prop["health"]) <= 0:
+            continue
+        var prop_position: Vector2 = prop["position"]
+        match str(prop["kind"]):
+            "crate", "boxes":
+                draw_rect(Rect2(prop_position - Vector2(22, 18), Vector2(44, 36)), Color("#9b7048"))
+                draw_line(prop_position + Vector2(-18, -14), prop_position + Vector2(18, 14), Color("#d1a16a"), 3.0)
+                draw_line(prop_position + Vector2(18, -14), prop_position + Vector2(-18, 14), Color("#d1a16a"), 3.0)
+            "trash":
+                draw_circle(prop_position, 20, Color("#4c6255"))
+                draw_circle(prop_position + Vector2(9, -8), 11, Color("#667968"))
+            "pallet":
+                draw_rect(Rect2(prop_position - Vector2(25, 12), Vector2(50, 24)), Color("#98734d"))
+                for plank in range(3):
+                    draw_line(prop_position + Vector2(-20 + plank * 20, -10), prop_position + Vector2(-20 + plank * 20, 10), Color("#d0a878"), 2.0)
+            "hydrant":
+                draw_rect(Rect2(prop_position - Vector2(9, 14), Vector2(18, 28)), Color("#b64e3d"))
+                draw_circle(prop_position + Vector2(0, -14), 10, Color("#d98a68"))
+            "bin":
+                draw_rect(Rect2(prop_position - Vector2(16, 20), Vector2(32, 40)), Color("#526a63"))
+                draw_rect(Rect2(prop_position + Vector2(-19, -22), Vector2(38, 5)), Color("#91a49a"))
+
 func _environment_label() -> String:
     match environment_kind:
         "shopfront":
@@ -98,6 +142,7 @@ func _environment_label() -> String:
 
 func _ready() -> void:
     _configure_encounter()
+    _build_environment_props()
     player_health = clampf(float(GameState.player_health), 1.0, 100.0)
     stamina_max = GameState.get_max_stamina()
     stamina = stamina_max
@@ -154,6 +199,8 @@ func _configure_encounter() -> void:
             enemy_windup = 0.64
             enemy_color = Color("#c58c4e")
             encounter_reward = 40
+            enemy_style = "guard"
+            enemy_attack_cooldown_timer = 0.35
         "alley_ambush":
             enemy_name = "Alley runner"
             enemy_health = 125.0
@@ -163,6 +210,8 @@ func _configure_encounter() -> void:
             enemy_windup = 0.58
             enemy_color = Color("#9e6bb0")
             encounter_reward = 35
+            enemy_style = "runner"
+            enemy_attack_cooldown_timer = 0.1
         _:
             enemy_name = "Corner challenger"
             enemy_health = 100.0
@@ -172,6 +221,8 @@ func _configure_encounter() -> void:
             enemy_windup = 0.78
             enemy_color = Color("#d66a55")
             encounter_reward = 50
+            enemy_style = "pressure"
+            enemy_attack_cooldown_timer = 0.65
 
 func _process(delta: float) -> void:
     if finished:
@@ -182,6 +233,17 @@ func _process(delta: float) -> void:
     if combo_window_timer <= 0.0:
         combo_step = 0
     enemy_recovery = maxf(0.0, enemy_recovery - delta)
+    enemy_attack_cooldown_timer = maxf(0.0, enemy_attack_cooldown_timer - delta)
+    enemy_decision_timer -= delta
+    if enemy_decision_timer <= 0.0:
+        enemy_orbit_direction *= -1.0
+        enemy_decision_timer = 1.4
+    enemy_hitstun_timer = maxf(0.0, enemy_hitstun_timer - delta)
+    hit_flash_timer = maxf(0.0, hit_flash_timer - delta)
+    player_hit_flash_timer = maxf(0.0, player_hit_flash_timer - delta)
+    player_swing_timer = maxf(0.0, player_swing_timer - delta)
+    enemy_swing_timer = maxf(0.0, enemy_swing_timer - delta)
+    enemy_recoil_timer = maxf(0.0, enemy_recoil_timer - delta)
     invulnerability_timer = maxf(0.0, invulnerability_timer - delta)
     stamina = minf(stamina_max, stamina + GameState.get_stamina_regen() * delta)
 
@@ -191,31 +253,141 @@ func _process(delta: float) -> void:
     else:
         var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down")
         player.position += direction * GameState.get_player_speed() * delta
+    player.position += player_knockback_velocity * delta
+    player_knockback_velocity = player_knockback_velocity.move_toward(Vector2.ZERO, 720.0 * delta)
 
     var horizontal_margin := 210.0 if environment_kind == "alley" else 38.0
     player.position.x = clampf(player.position.x, horizontal_margin, ARENA_SIZE.x - horizontal_margin)
     player.position.y = clampf(player.position.y, 205.0, 445.0)
 
     var distance := enemy.position.distance_to(player.position)
-    if distance > 61.0:
-        enemy.position = enemy.position.move_toward(player.position, enemy_speed * delta)
+    enemy.position += enemy_knockback_velocity * delta
+    enemy_knockback_velocity = enemy_knockback_velocity.move_toward(Vector2.ZERO, 620.0 * delta)
+    if enemy_hitstun_timer <= 0.0:
+        _update_enemy_positioning(delta, distance)
 
     if telegraph_timer >= 0.0:
         telegraph_timer -= delta
         telegraph.position = enemy.position
         telegraph.visible = true
         if telegraph_timer <= 0.0:
-            _resolve_enemy_attack()
-    elif enemy_recovery <= 0.0 and distance <= enemy_attack_range:
+            if enemy_feint_active:
+                _resolve_enemy_feint()
+            else:
+                _resolve_enemy_attack()
+    elif enemy_recovery <= 0.0 and enemy_attack_cooldown_timer <= 0.0 and distance <= enemy_attack_range:
         telegraph_timer = enemy_windup
         telegraph.position = enemy.position
-        telegraph.visible = true
-        _set_status("%s winding up — DODGE NOW!" % enemy_name)
+        _start_enemy_telegraph()
     else:
         telegraph.visible = false
 
-    player.modulate = Color(1.0, 1.0, 1.0, 0.45 if invulnerability_timer > 0.0 and int(Time.get_ticks_msec() / 80) % 2 == 0 else 1.0)
+    _update_combat_animation()
     _refresh()
+
+func _update_combat_animation() -> void:
+    # Lightweight procedural poses keep combat readable before final sprite
+    # sheets arrive. Timers are gameplay-driven, not decorative random motion.
+    if player_swing_timer > 0.0:
+        var swing_progress := 1.0 - player_swing_timer / player_swing_duration
+        player.rotation = lerpf(-0.34, 0.48, swing_progress)
+        player.scale = Vector2(1.12, 0.88) if swing_progress < 0.5 else Vector2(0.92, 1.12)
+    elif player_hit_flash_timer > 0.0:
+        player.rotation = 0.22 * sin(player_hit_flash_timer * 42.0)
+        player.scale = Vector2(0.88, 1.14)
+    elif dodge_timer > 0.0:
+        player.rotation = dodge_direction.x * 0.28
+        player.scale = Vector2(0.82, 1.12)
+    else:
+        player.rotation = 0.0
+        player.scale = Vector2.ONE
+
+    if enemy_swing_timer > 0.0:
+        var attack_progress := 1.0 - enemy_swing_timer / enemy_swing_duration
+        enemy.rotation = lerpf(-0.24, 0.42, attack_progress)
+        enemy.scale = Vector2(1.16, 0.86) if attack_progress < 0.55 else Vector2(0.9, 1.14)
+    elif enemy_recoil_timer > 0.0:
+        enemy.rotation = -0.3 * signf(enemy_knockback_velocity.x if enemy_knockback_velocity.x != 0.0 else 1.0)
+        enemy.scale = Vector2(0.86, 1.16)
+    elif telegraph_timer >= 0.0:
+        var windup_ratio := clampf(telegraph_timer / maxf(enemy_windup, 0.01), 0.0, 1.0)
+        enemy.rotation = -0.12 * (1.0 - windup_ratio)
+        enemy.scale = Vector2(1.0 + (0.12 if enemy_attack_kind == "heavy" else 0.05) * (1.0 - windup_ratio), 1.0)
+    else:
+        enemy.rotation = 0.0
+        enemy.scale = Vector2.ONE
+
+    var invulnerable_alpha := 0.45 if invulnerability_timer > 0.0 and int(Time.get_ticks_msec() / 80) % 2 == 0 else 1.0
+    player.modulate = Color(1.0, 0.45, 0.4, invulnerable_alpha) if player_hit_flash_timer > 0.0 else Color(1.0, 1.0, 1.0, invulnerable_alpha)
+    enemy.modulate = Color("#fff0c2") if hit_flash_timer > 0.0 else enemy_color
+    if telegraph.visible:
+        var pulse := 1.0 + 0.12 * sin(Time.get_ticks_msec() * 0.018)
+        telegraph.scale = Vector2.ONE * pulse
+
+func _update_enemy_positioning(delta: float, distance: float) -> void:
+    # Pressure fighters close distance relentlessly. Guards try to hold a
+    # preferred range and circle. Runners retreat when crowded, then re-enter.
+    var to_player := (player.position - enemy.position).normalized()
+    var perpendicular := Vector2(-to_player.y, to_player.x) * enemy_orbit_direction
+    var movement := Vector2.ZERO
+    match enemy_style:
+        "guard":
+            if distance > enemy_attack_range * 0.88:
+                movement = to_player * 0.72 + perpendicular * 0.28
+            elif distance < enemy_attack_range * 0.62:
+                movement = -to_player * 0.48 + perpendicular * 0.52
+            else:
+                movement = perpendicular * 0.42
+        "runner":
+            if distance < 118.0:
+                movement = -to_player * 0.82 + perpendicular * 0.18
+            elif distance > enemy_attack_range * 1.45:
+                movement = to_player
+            else:
+                movement = perpendicular * 0.62
+        _:
+            movement = to_player
+    if movement != Vector2.ZERO:
+        enemy.position += movement.normalized() * enemy_speed * delta
+
+func _start_enemy_telegraph() -> void:
+    enemy_attack_sequence += 1
+    enemy_feint_active = enemy_style == "runner" and enemy_attack_sequence % 3 == 0
+    var heavy_interval := 3 if enemy_style == "guard" else 4
+    enemy_attack_kind = "heavy" if not enemy_feint_active and enemy_attack_sequence % heavy_interval == 0 else "quick"
+    var windup_scale := 1.35 if enemy_attack_kind == "heavy" else 1.0
+    if enemy_feint_active:
+        windup_scale = 0.62
+    telegraph_timer = enemy_windup * windup_scale
+    telegraph.position = enemy.position
+    telegraph.color = Color(1.0, 0.55, 0.12, 0.32) if enemy_attack_kind == "heavy" else Color(0.95, 0.22, 0.18, 0.25)
+    telegraph.visible = true
+    if enemy_feint_active:
+        _set_status("%s shows a rush — don't dodge too early!" % enemy_name)
+    elif enemy_attack_kind == "heavy":
+        _set_status("%s loads a HEAVY strike — create distance!" % enemy_name)
+    else:
+        _set_status(_enemy_telegraph_message())
+
+func _resolve_enemy_feint() -> void:
+    # The runner sells an attack, then pulls out. The tell is intentionally
+    # shorter than a real attack and deals no damage; punish the recovery.
+    telegraph_timer = -1.0
+    enemy_feint_active = false
+    telegraph.visible = false
+    enemy_attack_cooldown_timer = 0.45
+    enemy_recovery = 0.42
+    enemy.position += (enemy.position - player.position).normalized() * 34.0
+    _set_status("%s pulled the feint. Stay ready and close the gap!" % enemy_name)
+
+func _enemy_telegraph_message() -> String:
+    match enemy_style:
+        "guard":
+            return "%s sets their feet — watch the counter!" % enemy_name
+        "runner":
+            return "%s darts in — DODGE THE RUSH!" % enemy_name
+        _:
+            return "%s winds up — DODGE NOW!" % enemy_name
 
 func _unhandled_input(event: InputEvent) -> void:
     if event.is_action_pressed("ui_cancel"):
@@ -235,13 +407,24 @@ func _attack() -> void:
         _set_status("Too far away. Move closer before attacking.")
         return
 
+    if _try_attack_environment_prop(get_combo_damage(GameState.get_attack_damage(), combo_step)):
+        player_swing_duration = 0.18
+        player_swing_timer = player_swing_duration
+        stamina -= ATTACK_COST
+        attack_cooldown = 0.42
+        combo_step = 0
+        combo_window_timer = 0.0
+        _refresh()
+        return
+
     var damage := get_combo_damage(GameState.get_attack_damage(), combo_step)
     stamina -= ATTACK_COST
     attack_cooldown = 0.42
     combo_step = (combo_step + 1) % 3
     combo_window_timer = 0.85
-    enemy_health = maxf(0.0, enemy_health - damage)
-    enemy.modulate = Color("#ffffff")
+    player_swing_duration = 0.18
+    player_swing_timer = player_swing_duration
+    _apply_enemy_hit(damage, 135.0, 0.16)
     if enemy_health <= 0.0:
         _win_encounter()
     else:
@@ -255,13 +438,24 @@ func _heavy_attack() -> void:
         _set_status("Heavy strike out of range. Move closer.")
         return
 
+    if _try_attack_environment_prop(get_heavy_attack_damage(GameState.get_attack_damage())):
+        player_swing_duration = 0.28
+        player_swing_timer = player_swing_duration
+        stamina -= HEAVY_ATTACK_COST
+        attack_cooldown = 0.78
+        combo_step = 0
+        combo_window_timer = 0.0
+        _refresh()
+        return
+
     stamina -= HEAVY_ATTACK_COST
     attack_cooldown = 0.78
     combo_step = 0
     combo_window_timer = 0.0
     var damage := get_heavy_attack_damage(GameState.get_attack_damage())
-    enemy_health = maxf(0.0, enemy_health - damage)
-    enemy.modulate = Color("#ffffff")
+    player_swing_duration = 0.28
+    player_swing_timer = player_swing_duration
+    _apply_enemy_hit(damage, 220.0, 0.26)
 
     var interrupted := telegraph_timer >= 0.0
     if interrupted:
@@ -275,6 +469,19 @@ func _heavy_attack() -> void:
         _set_status("HEAVY HIT — %d damage. You interrupted the incoming strike!" % damage)
     else:
         _set_status("HEAVY HIT — %d damage. Recover your stamina." % damage)
+
+func _apply_enemy_hit(damage: int, knockback_strength: float, stun_duration: float) -> void:
+    # Hit reaction is separated from damage math so light/heavy attacks and
+    # future enemy types share one consistent impact response.
+    enemy_health = maxf(0.0, enemy_health - damage)
+    var away_direction := (enemy.position - player.position).normalized()
+    if away_direction == Vector2.ZERO:
+        away_direction = Vector2.RIGHT
+    enemy_knockback_velocity = away_direction * knockback_strength
+    enemy_hitstun_timer = maxf(enemy_hitstun_timer, stun_duration)
+    enemy_recoil_timer = maxf(enemy_recoil_timer, stun_duration + 0.08)
+    enemy_swing_timer = 0.0
+    hit_flash_timer = 0.12
 
 func get_combo_damage(base_damage: int, combo_index: int) -> int:
     var multipliers := [1.0, 1.15, 1.35]
@@ -301,15 +508,30 @@ func _dodge() -> void:
 func _resolve_enemy_attack() -> void:
     telegraph_timer = -1.0
     telegraph.visible = false
-    enemy_recovery = 1.05
-    if player.position.distance_to(enemy.position) <= enemy_attack_range + 20.0 and invulnerability_timer <= 0.0:
-        player_health = maxf(0.0, player_health - enemy_damage)
+    enemy_feint_active = false
+    enemy_attack_cooldown_timer = 1.0 if enemy_style == "runner" else 1.35
+    enemy_recovery = 0.85 if enemy_style == "pressure" else 1.1
+    var to_player := (player.position - enemy.position).normalized()
+    if enemy_style == "runner":
+        # The alley runner commits to a short rush at the end of its warning.
+        enemy.position += to_player * 42.0
+    var is_heavy := enemy_attack_kind == "heavy"
+    var effective_range := enemy_attack_range + (38.0 if enemy_style == "runner" else 20.0) + (18.0 if is_heavy else 0.0)
+    var attack_damage := enemy_damage * (1.55 if is_heavy else 1.0)
+    var knockback := 225.0 if is_heavy else (190.0 if enemy_style == "runner" else 155.0)
+    enemy_swing_duration = 0.34 if is_heavy else 0.24
+    enemy_swing_timer = enemy_swing_duration
+    if player.position.distance_to(enemy.position) <= effective_range and invulnerability_timer <= 0.0:
+        player_hit_flash_timer = 0.16
+        player_health = maxf(0.0, player_health - attack_damage)
+        player_knockback_velocity = (player.position - enemy.position).normalized() * knockback
         GameState.player_health = int(player_health)
-        _set_status("You took a hit. Use SHIFT to dodge the next warning.")
+        _set_status("HEAVY STRIKE LANDED — %d damage!" % roundi(attack_damage) if is_heavy else "You took a hit. Use SHIFT to dodge the next warning.")
         if player_health <= 0.0:
             _lose_encounter()
     else:
         _set_status("Opponent missed. Counter while there is an opening.")
+    enemy_attack_kind = "quick"
 
 func _win_encounter() -> void:
     finished = true
@@ -403,3 +625,59 @@ func _refresh() -> void:
         enemy_hp_bar.value = enemy_health
     if stamina_bar:
         stamina_bar.value = stamina
+
+
+func _build_environment_props() -> void:
+    environment_props.clear()
+    match environment_kind:
+        "shopfront":
+            environment_props = [
+                {"name": "Produce crate", "position": Vector2(112, 252), "health": 2, "kind": "crate"},
+                {"name": "Delivery boxes", "position": Vector2(842, 356), "health": 2, "kind": "boxes"}
+            ]
+        "alley":
+            environment_props = [
+                {"name": "Trash bags", "position": Vector2(360, 350), "health": 1, "kind": "trash"},
+                {"name": "Loose pallet", "position": Vector2(620, 350), "health": 2, "kind": "pallet"}
+            ]
+        _:
+            environment_props = [
+                {"name": "Fire hydrant", "position": Vector2(86, 328), "health": 2, "kind": "hydrant"},
+                {"name": "Street bin", "position": Vector2(862, 350), "health": 2, "kind": "bin"}
+            ]
+    queue_redraw()
+
+func _try_attack_environment_prop(damage: int) -> bool:
+    # Props become melee targets only when closer than the opponent. This avoids
+    # stealing attacks intended for the enemy when both are in striking range.
+    var nearest_index := -1
+    var nearest_distance := PLAYER_ATTACK_RANGE
+    var enemy_distance: float = player.position.distance_to(enemy.position)
+    for index in range(environment_props.size()):
+        var prop: Dictionary = environment_props[index]
+        if int(prop["health"]) <= 0:
+            continue
+        var distance: float = player.position.distance_to(prop["position"])
+        if distance < nearest_distance and distance < enemy_distance:
+            nearest_distance = distance
+            nearest_index = index
+    if nearest_index < 0:
+        return false
+
+    var prop: Dictionary = environment_props[nearest_index]
+    prop["health"] = maxi(0, int(prop["health"]) - maxi(1, floori(float(damage) / 25.0)))
+    environment_props[nearest_index] = prop
+    if int(prop["health"]) == 0:
+        enemy_recovery = maxf(enemy_recovery, 0.35)
+        _set_status("%s cleared. You opened up room to move." % str(prop["name"]))
+    else:
+        _set_status("%s damaged. Keep striking to clear it." % str(prop["name"]))
+    queue_redraw()
+    return true
+
+func get_environment_prop_count() -> int:
+    var remaining := 0
+    for prop in environment_props:
+        if int(prop["health"]) > 0:
+            remaining += 1
+    return remaining
