@@ -90,7 +90,6 @@ func get_traffic_snapshot() -> Array[Dictionary]:
     var vehicles: Array[Dictionary] = []
     var minute_of_day := WorldClock.total_minutes % 1440
     var signal_state := get_traffic_signal_state()
-    var signal_phase := fposmod(_traffic_elapsed_seconds, 24.0)
     for profile in TRAFFIC_VEHICLES:
         if minute_of_day < int(profile["active_start"]) or minute_of_day >= int(profile["active_end"]):
             continue
@@ -98,19 +97,18 @@ func get_traffic_snapshot() -> Array[Dictionary]:
         var lane := float(profile["lane"])
         var speed := float(profile["speed"])
         var start := float(profile["start"])
-        var distance := absf(speed) * _traffic_elapsed_seconds
         var position: Vector2
         var stopped := false
         if axis == "horizontal":
             var x := fposmod(start + speed * _traffic_elapsed_seconds + 80.0, 1120.0) - 80.0
-            var approaches_intersection := (speed > 0.0 and x < 435.0 and x > 397.0) or (speed < 0.0 and x > 435.0 and x < 473.0)
+            var approaches_intersection := (speed > 0.0 and x >= 397.0) or (speed < 0.0 and x <= 473.0)
             stopped = approaches_intersection and signal_state != "horizontal"
             if stopped:
                 x = 397.0 if speed > 0.0 else 473.0
             position = Vector2(x, lane)
         else:
             var y := fposmod(start + speed * _traffic_elapsed_seconds + 80.0, 700.0) - 80.0
-            var approaches_intersection := (speed > 0.0 and y < 270.0 and y > 232.0) or (speed < 0.0 and y > 270.0 and y < 308.0)
+            var approaches_intersection := (speed > 0.0 and y >= 232.0) or (speed < 0.0 and y <= 308.0)
             stopped = approaches_intersection and signal_state != "vertical"
             if stopped:
                 y = 232.0 if speed > 0.0 else 308.0
