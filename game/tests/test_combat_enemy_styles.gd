@@ -32,10 +32,21 @@ func _run() -> void:
     guard.enemy.position = Vector2(440, 270)
     guard._update_enemy_positioning(0.1, 40.0)
     _check(guard.enemy.position.x > 440.0, "Guard should create space when the player crowds it.")
+    guard.enemy_attack_sequence = 2
+    guard._start_enemy_telegraph()
+    _check(guard.enemy_attack_kind == "heavy", "Guard should periodically telegraph a heavy strike.")
+    _check(guard.telegraph.color.r > guard.telegraph.color.g, "Heavy strike warning should use a distinct warning color.")
     guard.queue_free()
 
     var runner = await _make_combat("alley_ambush")
     _check(runner.enemy_style == "runner", "Alley runner should use runner archetype.")
+    runner.enemy_attack_sequence = 2
+    runner._start_enemy_telegraph()
+    _check(runner.enemy_feint_active, "Runner should periodically use a feint.")
+    var feint_health := runner.player_health
+    runner._resolve_enemy_feint()
+    _check(is_equal_approx(runner.player_health, feint_health), "A feint must not deal damage.")
+    _check(runner.enemy_recovery > 0.0, "A completed feint should leave a punishable recovery window.")
     runner.player.position = Vector2(400, 270)
     runner.enemy.position = Vector2(450, 270)
     runner._update_enemy_positioning(0.1, 50.0)
