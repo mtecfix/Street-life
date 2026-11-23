@@ -39,6 +39,16 @@ func _run() -> void:
     _check(not GameState.remove_item("medkit"), "Removing an item the player does not own should fail.")
     _check(_signal_count == count_before_invalid, "Rejected inventory operations must not emit change signals.")
 
+    # Capacity rejection must be atomic: no cash deduction and no signal.
+    GameState.inventory.clear()
+    _signal_count = 0
+    _check(GameState.add_item("snack", GameState.INVENTORY_CAPACITY), "A full inventory can be populated up to its cap.")
+    var cash_before_full_bag_purchase := GameState.player_cash
+    var signals_before_full_bag_purchase := _signal_count
+    _check(not GameState.purchase_item("soda"), "Purchases should fail when the bag is full.")
+    _check(GameState.player_cash == cash_before_full_bag_purchase, "A rejected full-bag purchase must not deduct cash.")
+    _check(_signal_count == signals_before_full_bag_purchase, "A rejected full-bag purchase must not emit an inventory signal.")
+
     EventBus.inventory_changed.disconnect(_on_inventory_changed)
     if _failures.is_empty():
         print("PASS: inventory mutations emit accurate change signals.")
