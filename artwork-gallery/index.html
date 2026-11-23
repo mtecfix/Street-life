@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Street-life — Generated Artwork Library</title>
+<style>
+:root{color-scheme:dark;--bg:#101318;--panel:#191f28;--line:#303947;--muted:#aab4c2;--text:#f3f5f8;--accent:#f0b45b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,sans-serif}
+header{padding:42px max(22px,calc((100vw - 1240px)/2));background:linear-gradient(130deg,#202a38,#12171e);border-bottom:1px solid var(--line)}
+h1{margin:0 0 8px;font-size:clamp(28px,5vw,44px)}p{color:var(--muted);margin:0}
+main{max-width:1240px;margin:auto;padding:28px 22px 60px}
+.toolbar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:28px}
+input,select{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:11px 13px;font:inherit}
+input{flex:1;min-width:210px}.count{align-self:center;color:var(--muted)}
+section{margin:30px 0}h2{font-size:21px;margin:0 0 14px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px}
+figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.preview{height:170px;display:grid;place-items:center;padding:12px;background-color:#242b35;background-image:linear-gradient(45deg,#303844 25%,transparent 25%),linear-gradient(-45deg,#303844 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#303844 75%),linear-gradient(-45deg,transparent 75%,#303844 75%);background-size:20px 20px;background-position:0 0,0 10px,10px -10px,-10px 0}
+img{max-width:100%;max-height:100%;object-fit:contain;image-rendering:pixelated}
+figcaption{padding:10px 11px;font-size:13px;overflow-wrap:anywhere}.kind{display:block;color:var(--accent);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+a{color:inherit;text-decoration:none}a:hover figure{border-color:var(--accent)}footer{border-top:1px solid var(--line);padding:20px;color:var(--muted);text-align:center}
+</style></head>
+<body><header><h1>Street-life Artwork Library</h1><p>Generated environment sprites · 64 transparent PNG assets · original pixel-art resources</p></header>
+<main><div class="toolbar"><input id="search" type="search" placeholder="Search assets…"><select id="filter"><option value="all">All asset types</option><option value="props">Street & bodega props</option><option value="facades">Building facades</option><option value="tiles">Environment tiles</option></select><span class="count" id="count">64 assets</span></div><div id="gallery"></div></main><footer>Street-life / Hustler · Generated artwork collection</footer>
+<script>
+const groups=[
+{title:"Bodega props",kind:"props",prefix:"bodega_prop_",count:12,folder:"props"},
+{title:"Bronx street props",kind:"props",prefix:"bronx_street_prop_",count:12,folder:"props"},
+{title:"Bronx facade modules",kind:"facades",prefix:"bronx_facade_",count:8,folder:"facades"},
+{title:"Bodega environment tiles",kind:"tiles",prefix:"bodega_tile_",count:32,folder:"tiles"}];
+const assets=groups.flatMap(g=>Array.from({length:g.count},(_,i)=>({title:g.prefix+String(i).padStart(2,"0"),kind:g.kind,group:g.title,src:"assets/sprites/generated/"+g.folder+"/"+g.prefix+String(i).padStart(2,"0")+".png"})));
+const root=document.getElementById("gallery"),search=document.getElementById("search"),filter=document.getElementById("filter"),count=document.getElementById("count");
+function render(){const q=search.value.toLowerCase(),f=filter.value;const visible=assets.filter(a=>(f==="all"||a.kind===f)&&(a.title+" "+a.group).toLowerCase().includes(q));count.textContent=visible.length+" of "+assets.length+" assets";root.innerHTML="";for(const g of groups){const items=visible.filter(a=>a.group===g.title);if(!items.length)continue;const section=document.createElement("section"),h=document.createElement("h2"),grid=document.createElement("div");h.textContent=g.title+" ("+items.length+")";grid.className="grid";for(const a of items){const link=document.createElement("a");link.href=a.src;link.target="_blank";link.rel="noopener";const fig=document.createElement("figure"),preview=document.createElement("div"),img=document.createElement("img"),cap=document.createElement("figcaption"),tag=document.createElement("span");preview.className="preview";img.src=a.src;img.alt=a.title;img.loading="lazy";tag.className="kind";tag.textContent=a.kind;cap.append(tag,a.title);preview.append(img);fig.append(preview,cap);link.append(fig);grid.append(link)}section.append(h,grid);root.append(section)}}search.addEventListener("input",render);filter.addEventListener("change",render);render();
+</script></body></html>
