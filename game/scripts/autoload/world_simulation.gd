@@ -235,7 +235,10 @@ func get_business_snapshot(business_id: String) -> Dictionary:
     return {
         "open": minute_of_day >= int(business["open"]) and minute_of_day < int(business["close"]),
         "customers_today": int(state.get("customers_today", 0)),
-        "last_simulated_hour": int(state.get("last_simulated_hour", -1))
+        "last_simulated_hour": int(state.get("last_simulated_hour", -1)),
+        "stock": state.get("stock", {"snack": 12, "medkit": 5, "soda": 16}),
+        "employee_on_shift": minute_of_day >= 420 and minute_of_day < 1200,
+        "employee_name": "Tasha"
     }
 
 func get_city_activity_level() -> int:
@@ -261,8 +264,18 @@ func _refresh_business_simulation() -> void:
     var stored_day := int(business_state.get("day", current_day))
     var last_hour := int(business_state.get("last_simulated_hour", -1))
     if stored_day != current_day:
-        business_state = {"day": current_day, "customers_today": 0, "last_simulated_hour": -1}
+        business_state = {
+            "day": current_day,
+            "customers_today": 0,
+            "last_simulated_hour": -1,
+            "stock": {"snack": 12, "medkit": 5, "soda": 16},
+            "last_restock_day": current_day
+        }
         last_hour = -1
+    if not business_state.has("stock"):
+        business_state["stock"] = {"snack": 12, "medkit": 5, "soda": 16}
+    if not business_state.has("last_restock_day"):
+        business_state["last_restock_day"] = current_day
     if last_hour < 0:
         last_hour = current_hour_stamp - 1
     for hour_stamp in range(last_hour + 1, current_hour_stamp + 1):
@@ -270,6 +283,15 @@ func _refresh_business_simulation() -> void:
         if hour_of_day >= 6 and hour_of_day < 21:
             var hourly_customers := 4 if hour_of_day >= 16 and hour_of_day < 20 else (2 if hour_of_day >= 7 and hour_of_day < 10 else 1)
             business_state["customers_today"] = int(business_state.get("customers_today", 0)) + hourly_customers
+            var stock: Dictionary = business_state.get("stock", {}).duplicate(true)
+            var sold_snacks := mini(int(stock.get("snack", 0)), hourly_customers)
+            var sold_sodas := mini(int(stock.get("soda", 0)), maxi(0, hourly_customers - 1))
+            stock["snack"] = int(stock.get("snack", 0)) - sold_snacks
+            stock["soda"] = int(stock.get("soda", 0)) - sold_sodas
+            business_state["stock"] = stock
+        if hour_of_day == 6 and int(business_state.get("last_restock_day", -1)) != current_day:
+            business_state["stock"] = {"snack": 12, "medkit": 5, "soda": 16}
+            business_state["last_restock_day"] = current_day
     business_state["day"] = current_day
     business_state["last_simulated_hour"] = current_hour_stamp
     city_state["mayas_market"] = business_state
