@@ -14,6 +14,11 @@ var enemy_speed := 92.0
 var enemy_attack_range := 76.0
 var enemy_damage := 18.0
 var enemy_windup := 0.78
+# Each encounter gets a readable AI archetype rather than identical chase-and-swing logic.
+var enemy_style := "pressure"
+var enemy_decision_timer := 0.0
+var enemy_orbit_direction := 1.0
+var enemy_attack_cooldown_timer := 0.0
 var enemy_name := "Corner challenger"
 var enemy_color := Color("#d66a55")
 var enemy_health := 100.0
@@ -185,6 +190,8 @@ func _configure_encounter() -> void:
             enemy_windup = 0.64
             enemy_color = Color("#c58c4e")
             encounter_reward = 40
+            enemy_style = "guard"
+            enemy_attack_cooldown_timer = 0.35
         "alley_ambush":
             enemy_name = "Alley runner"
             enemy_health = 125.0
@@ -194,6 +201,8 @@ func _configure_encounter() -> void:
             enemy_windup = 0.58
             enemy_color = Color("#9e6bb0")
             encounter_reward = 35
+            enemy_style = "runner"
+            enemy_attack_cooldown_timer = 0.1
         _:
             enemy_name = "Corner challenger"
             enemy_health = 100.0
@@ -203,6 +212,8 @@ func _configure_encounter() -> void:
             enemy_windup = 0.78
             enemy_color = Color("#d66a55")
             encounter_reward = 50
+            enemy_style = "pressure"
+            enemy_attack_cooldown_timer = 0.65
 
 func _process(delta: float) -> void:
     if finished:
@@ -213,6 +224,11 @@ func _process(delta: float) -> void:
     if combo_window_timer <= 0.0:
         combo_step = 0
     enemy_recovery = maxf(0.0, enemy_recovery - delta)
+    enemy_attack_cooldown_timer = maxf(0.0, enemy_attack_cooldown_timer - delta)
+    enemy_decision_timer -= delta
+    if enemy_decision_timer <= 0.0:
+        enemy_orbit_direction *= -1.0
+        enemy_decision_timer = 1.4
     enemy_hitstun_timer = maxf(0.0, enemy_hitstun_timer - delta)
     hit_flash_timer = maxf(0.0, hit_flash_timer - delta)
     invulnerability_timer = maxf(0.0, invulnerability_timer - delta)
@@ -234,8 +250,8 @@ func _process(delta: float) -> void:
     var distance := enemy.position.distance_to(player.position)
     enemy.position += enemy_knockback_velocity * delta
     enemy_knockback_velocity = enemy_knockback_velocity.move_toward(Vector2.ZERO, 620.0 * delta)
-    if enemy_hitstun_timer <= 0.0 and distance > 61.0:
-        enemy.position = enemy.position.move_toward(player.position, enemy_speed * delta)
+    if enemy_hitstun_timer <= 0.0:
+        _update_enemy_positioning(delta, distance)
 
     if telegraph_timer >= 0.0:
         telegraph_timer -= delta
@@ -243,17 +259,52 @@ func _process(delta: float) -> void:
         telegraph.visible = true
         if telegraph_timer <= 0.0:
             _resolve_enemy_attack()
-    elif enemy_recovery <= 0.0 and distance <= enemy_attack_range:
+    elif enemy_recovery <= 0.0 and enemy_attack_cooldown_timer <= 0.0 and distance <= enemy_attack_range:
         telegraph_timer = enemy_windup
         telegraph.position = enemy.position
         telegraph.visible = true
-        _set_status("%s winding up — DODGE NOW!" % enemy_name)
+        _set_status(_enemy_telegraph_message())
     else:
         telegraph.visible = false
 
     player.modulate = Color(1.0, 1.0, 1.0, 0.45 if invulnerability_timer > 0.0 and int(Time.get_ticks_msec() / 80) % 2 == 0 else 1.0)
     enemy.modulate = Color("#fff0c2") if hit_flash_timer > 0.0 else enemy_color
     _refresh()
+
+func _update_enemy_positioning(delta: float, distance: float) -> void:
+    # Pressure fighters close distance relentlessly. Guards try to hold a
+    # preferred range and circle. Runners retreat when crowded, then re-enter.
+    var to_player := (player.position - enemy.position).normalized()
+    var perpendicular := Vector2(-to_player.y, to_player.x) * enemy_orbit_direction
+    var movement := Vector2.ZERO
+    match enemy_style:
+        "guard":
+            if distance > enemy_attack_range * 0.88:
+                movement = to_player * 0.72 + perpendicular * 0.28
+            elif distance < enemy_attack_range * 0.62:
+                movement = -to_player * 0.48 + perpendicular * 0.52
+            else:
+                movement = perpendicular * 0.42
+        "runner":
+            if distance < 118.0:
+                movement = -to_player * 0.82 + perpendicular * 0.18
+            elif distance > enemy_attack_range * 1.45:
+                movement = to_player
+            else:
+                movement = perpendicular * 0.62
+        _:
+            movement = to_player
+    if movement != Vector2.ZERO:
+        enemy.position += movement.normalized() * enemy_speed * delta
+
+func _enemy_telegraph_message() -> String:
+    match enemy_style:
+        "guard":
+            return "%s sets their feet — watch the counter!" % enemy_name
+        "runner":
+            return "%s darts in — DODGE THE RUSH!" % enemy_name
+        _:
+            return "%s winds up — DODGE NOW!" % enemy_name
 
 func _unhandled_input(event: InputEvent) -> void:
     if event.is_action_pressed("ui_cancel"):
@@ -364,10 +415,16 @@ func _dodge() -> void:
 func _resolve_enemy_attack() -> void:
     telegraph_timer = -1.0
     telegraph.visible = false
-    enemy_recovery = 1.05
-    if player.position.distance_to(enemy.position) <= enemy_attack_range + 20.0 and invulnerability_timer <= 0.0:
+    enemy_attack_cooldown_timer = 1.0 if enemy_style == "runner" else 1.35
+    enemy_recovery = 0.85 if enemy_style == "pressure" else 1.1
+    var to_player := (player.position - enemy.position).normalized()
+    if enemy_style == "runner":
+        # The alley runner commits to a short rush at the end of its warning.
+        enemy.position += to_player * 42.0
+    var effective_range := enemy_attack_range + (38.0 if enemy_style == "runner" else 20.0)
+    if player.position.distance_to(enemy.position) <= effective_range and invulnerability_timer <= 0.0:
         player_health = maxf(0.0, player_health - enemy_damage)
-        player_knockback_velocity = (player.position - enemy.position).normalized() * 155.0
+        player_knockback_velocity = (player.position - enemy.position).normalized() * (190.0 if enemy_style == "runner" else 155.0)
         GameState.player_health = int(player_health)
         _set_status("You took a hit. Use SHIFT to dodge the next warning.")
         if player_health <= 0.0:
