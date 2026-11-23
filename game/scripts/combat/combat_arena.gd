@@ -408,6 +408,8 @@ func _attack() -> void:
         return
 
     if _try_attack_environment_prop(get_combo_damage(GameState.get_attack_damage(), combo_step)):
+        player_swing_duration = 0.18
+        player_swing_timer = player_swing_duration
         stamina -= ATTACK_COST
         attack_cooldown = 0.42
         combo_step = 0
@@ -420,6 +422,7 @@ func _attack() -> void:
     attack_cooldown = 0.42
     combo_step = (combo_step + 1) % 3
     combo_window_timer = 0.85
+    player_swing_duration = 0.18
     player_swing_timer = player_swing_duration
     _apply_enemy_hit(damage, 135.0, 0.16)
     if enemy_health <= 0.0:
@@ -436,6 +439,8 @@ func _heavy_attack() -> void:
         return
 
     if _try_attack_environment_prop(get_heavy_attack_damage(GameState.get_attack_damage())):
+        player_swing_duration = 0.28
+        player_swing_timer = player_swing_duration
         stamina -= HEAVY_ATTACK_COST
         attack_cooldown = 0.78
         combo_step = 0
