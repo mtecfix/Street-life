@@ -34,6 +34,39 @@ const BUSINESSES := {
     "mayas_market": {"open": 360, "close": 1260}
 }
 
+
+## Ambient residents are lightweight background agents. Their positions are a
+## pure function of world time, so they remain consistent across scene changes.
+const AMBIENT_PEDESTRIANS := [
+    {"id": "walker_01", "sprite": 1, "start": 420, "end": 1260, "from": Vector2(40, 260), "to": Vector2(330, 260), "phase": 0.08},
+    {"id": "walker_02", "sprite": 3, "start": 420, "end": 1260, "from": Vector2(330, 285), "to": Vector2(40, 285), "phase": 0.34},
+    {"id": "walker_03", "sprite": 2, "start": 480, "end": 1200, "from": Vector2(535, 250), "to": Vector2(920, 250), "phase": 0.16},
+    {"id": "walker_04", "sprite": 4, "start": 480, "end": 1200, "from": Vector2(920, 300), "to": Vector2(535, 300), "phase": 0.52},
+    {"id": "walker_05", "sprite": 0, "start": 600, "end": 1320, "from": Vector2(380, 365), "to": Vector2(610, 365), "phase": 0.22},
+    {"id": "walker_06", "sprite": 2, "start": 600, "end": 1320, "from": Vector2(610, 390), "to": Vector2(380, 390), "phase": 0.68},
+    {"id": "walker_07", "sprite": 3, "start": 900, "end": 1380, "from": Vector2(60, 180), "to": Vector2(330, 180), "phase": 0.41},
+    {"id": "walker_08", "sprite": 1, "start": 900, "end": 1380, "from": Vector2(900, 350), "to": Vector2(540, 350), "phase": 0.76}
+]
+
+func get_ambient_pedestrians() -> Array[Dictionary]:
+    var pedestrians: Array[Dictionary] = []
+    var minute_of_day := WorldClock.total_minutes % 1440
+    for profile in AMBIENT_PEDESTRIANS:
+        var start := int(profile["start"])
+        var finish := int(profile["end"])
+        if minute_of_day < start or minute_of_day >= finish:
+            continue
+        var duration := float(finish - start)
+        var progress := fposmod((float(minute_of_day - start) / duration) + float(profile["phase"]), 1.0)
+        var origin: Vector2 = profile["from"]
+        var destination: Vector2 = profile["to"]
+        pedestrians.append({
+            "id": str(profile["id"]),
+            "sprite": int(profile["sprite"]),
+            "position": origin.lerp(destination, progress)
+        })
+    return pedestrians
+
 var _last_activity_level := -1
 
 func _ready() -> void:
