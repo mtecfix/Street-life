@@ -39,6 +39,8 @@ var status: Label
 var player_hp_bar: ProgressBar
 var enemy_hp_bar: ProgressBar
 var stamina_bar: ProgressBar
+# Breakable props anchor combat to the environment instead of a generic arena.
+var environment_props: Array[Dictionary] = []
 
 func _draw() -> void:
     draw_rect(Rect2(Vector2.ZERO, ARENA_SIZE), Color("#171d29"))
@@ -87,6 +89,30 @@ func _draw() -> void:
             draw_rect(Rect2(66, 292, 40, 10), Color("#d98a68"))
             draw_string(ThemeDB.fallback_font, Vector2(28, 495), "NEIGHBORHOOD STREET CORNER", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#e7c99d"))
 
+    # Draw the location-specific props after the fixed environment art.
+    for prop in environment_props:
+        if int(prop["health"]) <= 0:
+            continue
+        var prop_position: Vector2 = prop["position"]
+        match str(prop["kind"]):
+            "crate", "boxes":
+                draw_rect(Rect2(prop_position - Vector2(22, 18), Vector2(44, 36)), Color("#9b7048"))
+                draw_line(prop_position + Vector2(-18, -14), prop_position + Vector2(18, 14), Color("#d1a16a"), 3.0)
+                draw_line(prop_position + Vector2(18, -14), prop_position + Vector2(-18, 14), Color("#d1a16a"), 3.0)
+            "trash":
+                draw_circle(prop_position, 20, Color("#4c6255"))
+                draw_circle(prop_position + Vector2(9, -8), 11, Color("#667968"))
+            "pallet":
+                draw_rect(Rect2(prop_position - Vector2(25, 12), Vector2(50, 24)), Color("#98734d"))
+                for plank in range(3):
+                    draw_line(prop_position + Vector2(-20 + plank * 20, -10), prop_position + Vector2(-20 + plank * 20, 10), Color("#d0a878"), 2.0)
+            "hydrant":
+                draw_rect(Rect2(prop_position - Vector2(9, 14), Vector2(18, 28)), Color("#b64e3d"))
+                draw_circle(prop_position + Vector2(0, -14), 10, Color("#d98a68"))
+            "bin":
+                draw_rect(Rect2(prop_position - Vector2(16, 20), Vector2(32, 40)), Color("#526a63"))
+                draw_rect(Rect2(prop_position + Vector2(-19, -22), Vector2(38, 5)), Color("#91a49a"))
+
 func _environment_label() -> String:
     match environment_kind:
         "shopfront":
@@ -98,6 +124,7 @@ func _environment_label() -> String:
 
 func _ready() -> void:
     _configure_encounter()
+    _build_environment_props()
     player_health = clampf(float(GameState.player_health), 1.0, 100.0)
     stamina_max = GameState.get_max_stamina()
     stamina = stamina_max
@@ -235,6 +262,14 @@ func _attack() -> void:
         _set_status("Too far away. Move closer before attacking.")
         return
 
+    if _try_attack_environment_prop(get_combo_damage(GameState.get_attack_damage(), combo_step)):
+        stamina -= ATTACK_COST
+        attack_cooldown = 0.42
+        combo_step = 0
+        combo_window_timer = 0.0
+        _refresh()
+        return
+
     var damage := get_combo_damage(GameState.get_attack_damage(), combo_step)
     stamina -= ATTACK_COST
     attack_cooldown = 0.42
@@ -253,6 +288,14 @@ func _heavy_attack() -> void:
         return
     if player.position.distance_to(enemy.position) > PLAYER_ATTACK_RANGE:
         _set_status("Heavy strike out of range. Move closer.")
+        return
+
+    if _try_attack_environment_prop(get_heavy_attack_damage(GameState.get_attack_damage())):
+        stamina -= HEAVY_ATTACK_COST
+        attack_cooldown = 0.78
+        combo_step = 0
+        combo_window_timer = 0.0
+        _refresh()
         return
 
     stamina -= HEAVY_ATTACK_COST
@@ -403,3 +446,59 @@ func _refresh() -> void:
         enemy_hp_bar.value = enemy_health
     if stamina_bar:
         stamina_bar.value = stamina
+
+
+func _build_environment_props() -> void:
+    environment_props.clear()
+    match environment_kind:
+        "shopfront":
+            environment_props = [
+                {"name": "Produce crate", "position": Vector2(112, 252), "health": 2, "kind": "crate"},
+                {"name": "Delivery boxes", "position": Vector2(842, 356), "health": 2, "kind": "boxes"}
+            ]
+        "alley":
+            environment_props = [
+                {"name": "Trash bags", "position": Vector2(118, 278), "health": 1, "kind": "trash"},
+                {"name": "Loose pallet", "position": Vector2(858, 365), "health": 2, "kind": "pallet"}
+            ]
+        _:
+            environment_props = [
+                {"name": "Fire hydrant", "position": Vector2(86, 328), "health": 2, "kind": "hydrant"},
+                {"name": "Street bin", "position": Vector2(862, 350), "health": 2, "kind": "bin"}
+            ]
+    queue_redraw()
+
+func _try_attack_environment_prop(damage: int) -> bool:
+    # Props become melee targets only when closer than the opponent. This avoids
+    # stealing attacks intended for the enemy when both are in striking range.
+    var nearest_index := -1
+    var nearest_distance := PLAYER_ATTACK_RANGE
+    var enemy_distance: float = player.position.distance_to(enemy.position)
+    for index in range(environment_props.size()):
+        var prop: Dictionary = environment_props[index]
+        if int(prop["health"]) <= 0:
+            continue
+        var distance: float = player.position.distance_to(prop["position"])
+        if distance < nearest_distance and distance < enemy_distance:
+            nearest_distance = distance
+            nearest_index = index
+    if nearest_index < 0:
+        return false
+
+    var prop: Dictionary = environment_props[nearest_index]
+    prop["health"] = maxi(0, int(prop["health"]) - maxi(1, floori(float(damage) / 25.0)))
+    environment_props[nearest_index] = prop
+    if int(prop["health"]) == 0:
+        enemy_recovery = maxf(enemy_recovery, 0.35)
+        _set_status("%s cleared. You opened up room to move." % str(prop["name"]))
+    else:
+        _set_status("%s damaged. Keep striking to clear it." % str(prop["name"]))
+    queue_redraw()
+    return true
+
+func get_environment_prop_count() -> int:
+    var remaining := 0
+    for prop in environment_props:
+        if int(prop["health"]) > 0:
+            remaining += 1
+    return remaining
