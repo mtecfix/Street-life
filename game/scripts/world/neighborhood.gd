@@ -306,14 +306,16 @@ func _start_mission_encounter(encounter_id: String) -> void:
     SceneManager.change_to(combat_scene)
 
 func _sync_npc_schedules() -> void:
-    var hour := WorldClock.get_hour()
-    for npc in npcs:
-        var active := false
-        for window in npc["windows"]:
-            if hour >= int(window[0]) and hour < int(window[1]):
-                active = true
-                break
-        npc["active"] = active
+    for index in range(npcs.size()):
+        var npc: Dictionary = npcs[index]
+        var snapshot: Dictionary = WorldSimulation.get_resident_snapshot(str(npc["id"]))
+        if snapshot.is_empty():
+            npc["active"] = false
+            continue
+        npc["active"] = bool(snapshot["active"])
+        npc["position"] = snapshot["position"]
+        npc["activity"] = str(snapshot["activity"])
+        npcs[index] = npc
     queue_redraw()
 
 func _use_consumable(item_id: String) -> void:
