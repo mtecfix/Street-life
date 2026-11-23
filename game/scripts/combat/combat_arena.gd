@@ -37,6 +37,12 @@ var enemy_hitstun_timer := 0.0
 var enemy_knockback_velocity := Vector2.ZERO
 var player_knockback_velocity := Vector2.ZERO
 var hit_flash_timer := 0.0
+var player_hit_flash_timer := 0.0
+var player_swing_timer := 0.0
+var player_swing_duration := 0.18
+var enemy_swing_timer := 0.0
+var enemy_swing_duration := 0.24
+var enemy_recoil_timer := 0.0
 var telegraph_timer := -1.0
 var dodge_timer := 0.0
 var invulnerability_timer := 0.0
@@ -234,6 +240,10 @@ func _process(delta: float) -> void:
         enemy_decision_timer = 1.4
     enemy_hitstun_timer = maxf(0.0, enemy_hitstun_timer - delta)
     hit_flash_timer = maxf(0.0, hit_flash_timer - delta)
+    player_hit_flash_timer = maxf(0.0, player_hit_flash_timer - delta)
+    player_swing_timer = maxf(0.0, player_swing_timer - delta)
+    enemy_swing_timer = maxf(0.0, enemy_swing_timer - delta)
+    enemy_recoil_timer = maxf(0.0, enemy_recoil_timer - delta)
     invulnerability_timer = maxf(0.0, invulnerability_timer - delta)
     stamina = minf(stamina_max, stamina + GameState.get_stamina_regen() * delta)
 
@@ -272,9 +282,47 @@ func _process(delta: float) -> void:
     else:
         telegraph.visible = false
 
-    player.modulate = Color(1.0, 1.0, 1.0, 0.45 if invulnerability_timer > 0.0 and int(Time.get_ticks_msec() / 80) % 2 == 0 else 1.0)
-    enemy.modulate = Color("#fff0c2") if hit_flash_timer > 0.0 else enemy_color
+    _update_combat_animation()
     _refresh()
+
+func _update_combat_animation() -> void:
+    # Lightweight procedural poses keep combat readable before final sprite
+    # sheets arrive. Timers are gameplay-driven, not decorative random motion.
+    if player_swing_timer > 0.0:
+        var swing_progress := 1.0 - player_swing_timer / player_swing_duration
+        player.rotation = lerpf(-0.34, 0.48, swing_progress)
+        player.scale = Vector2(1.12, 0.88) if swing_progress < 0.5 else Vector2(0.92, 1.12)
+    elif player_hit_flash_timer > 0.0:
+        player.rotation = 0.22 * sin(player_hit_flash_timer * 42.0)
+        player.scale = Vector2(0.88, 1.14)
+    elif dodge_timer > 0.0:
+        player.rotation = dodge_direction.x * 0.28
+        player.scale = Vector2(0.82, 1.12)
+    else:
+        player.rotation = 0.0
+        player.scale = Vector2.ONE
+
+    if enemy_swing_timer > 0.0:
+        var attack_progress := 1.0 - enemy_swing_timer / enemy_swing_duration
+        enemy.rotation = lerpf(-0.24, 0.42, attack_progress)
+        enemy.scale = Vector2(1.16, 0.86) if attack_progress < 0.55 else Vector2(0.9, 1.14)
+    elif enemy_recoil_timer > 0.0:
+        enemy.rotation = -0.3 * signf(enemy_knockback_velocity.x if enemy_knockback_velocity.x != 0.0 else 1.0)
+        enemy.scale = Vector2(0.86, 1.16)
+    elif telegraph_timer >= 0.0:
+        var windup_ratio := clampf(telegraph_timer / maxf(enemy_windup, 0.01), 0.0, 1.0)
+        enemy.rotation = -0.12 * (1.0 - windup_ratio)
+        enemy.scale = Vector2(1.0 + (0.12 if enemy_attack_kind == "heavy" else 0.05) * (1.0 - windup_ratio), 1.0)
+    else:
+        enemy.rotation = 0.0
+        enemy.scale = Vector2.ONE
+
+    var invulnerable_alpha := 0.45 if invulnerability_timer > 0.0 and int(Time.get_ticks_msec() / 80) % 2 == 0 else 1.0
+    player.modulate = Color(1.0, 0.45, 0.4, invulnerable_alpha) if player_hit_flash_timer > 0.0 else Color(1.0, 1.0, 1.0, invulnerable_alpha)
+    enemy.modulate = Color("#fff0c2") if hit_flash_timer > 0.0 else enemy_color
+    if telegraph.visible:
+        var pulse := 1.0 + 0.12 * sin(Time.get_ticks_msec() * 0.018)
+        telegraph.scale = Vector2.ONE * pulse
 
 func _update_enemy_positioning(delta: float, distance: float) -> void:
     # Pressure fighters close distance relentlessly. Guards try to hold a
@@ -372,6 +420,7 @@ func _attack() -> void:
     attack_cooldown = 0.42
     combo_step = (combo_step + 1) % 3
     combo_window_timer = 0.85
+    player_swing_timer = player_swing_duration
     _apply_enemy_hit(damage, 135.0, 0.16)
     if enemy_health <= 0.0:
         _win_encounter()
@@ -399,6 +448,8 @@ func _heavy_attack() -> void:
     combo_step = 0
     combo_window_timer = 0.0
     var damage := get_heavy_attack_damage(GameState.get_attack_damage())
+    player_swing_duration = 0.28
+    player_swing_timer = player_swing_duration
     _apply_enemy_hit(damage, 220.0, 0.26)
 
     var interrupted := telegraph_timer >= 0.0
@@ -423,6 +474,8 @@ func _apply_enemy_hit(damage: int, knockback_strength: float, stun_duration: flo
         away_direction = Vector2.RIGHT
     enemy_knockback_velocity = away_direction * knockback_strength
     enemy_hitstun_timer = maxf(enemy_hitstun_timer, stun_duration)
+    enemy_recoil_timer = maxf(enemy_recoil_timer, stun_duration + 0.08)
+    enemy_swing_timer = 0.0
     hit_flash_timer = 0.12
 
 func get_combo_damage(base_damage: int, combo_index: int) -> int:
@@ -461,7 +514,10 @@ func _resolve_enemy_attack() -> void:
     var effective_range := enemy_attack_range + (38.0 if enemy_style == "runner" else 20.0) + (18.0 if is_heavy else 0.0)
     var attack_damage := enemy_damage * (1.55 if is_heavy else 1.0)
     var knockback := 225.0 if is_heavy else (190.0 if enemy_style == "runner" else 155.0)
+    enemy_swing_duration = 0.34 if is_heavy else 0.24
+    enemy_swing_timer = enemy_swing_duration
     if player.position.distance_to(enemy.position) <= effective_range and invulnerability_timer <= 0.0:
+        player_hit_flash_timer = 0.16
         player_health = maxf(0.0, player_health - attack_damage)
         player_knockback_velocity = (player.position - enemy.position).normalized() * knockback
         GameState.player_health = int(player_health)
