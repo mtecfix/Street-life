@@ -76,7 +76,10 @@ func _unhandled_input(event: InputEvent) -> void:
         _exit_interior()
 
 func _purchase(item_id: String) -> void:
-    if GameState.purchase_item(item_id):
+    if not WorldSimulation.has_business_stock("mayas_market", item_id):
+        status_label.text = "Tasha: We're sold out of that item. Check back after the morning restock."
+    elif GameState.purchase_item(item_id):
+        WorldSimulation.record_business_sale("mayas_market", item_id)
         var item: Dictionary = GameState.ITEM_DEFINITIONS[item_id]
         status_label.text = "Purchased %s for $%d." % [str(item["name"]), int(item["price"])]
         # GameState.purchase_item() emits the authoritative inventory update.
@@ -152,16 +155,22 @@ func _build_shop_interface() -> void:
 func _refresh_shop_interface() -> void:
     if not is_instance_valid(shop_summary):
         return
-    shop_summary.text = "CASH  $%d     BAG  %d/%d" % [
+    var market := WorldSimulation.get_business_snapshot("mayas_market")
+    var stock: Dictionary = market.get("stock", {})
+    shop_summary.text = "CASH  $%d     BAG  %d/%d     STOCK: SNACK %d / MEDKIT %d / SODA %d" % [
         GameState.player_cash,
         GameState.get_inventory_count(),
-        GameState.INVENTORY_CAPACITY
+        GameState.INVENTORY_CAPACITY,
+        int(stock.get("snack", 0)),
+        int(stock.get("medkit", 0)),
+        int(stock.get("soda", 0))
     ]
     for item_id in shop_buttons:
         var item: Dictionary = GameState.ITEM_DEFINITIONS[item_id]
         var can_afford := GameState.player_cash >= int(item["price"])
         var has_space := GameState.get_inventory_count() < GameState.INVENTORY_CAPACITY
-        shop_buttons[item_id].disabled = not can_afford or not has_space
+        var in_stock := int(stock.get(item_id, 0)) > 0
+        shop_buttons[item_id].disabled = not can_afford or not has_space or not in_stock
 
 func _purchase_failure_reason(item_id: String) -> String:
     var item: Dictionary = GameState.ITEM_DEFINITIONS[item_id]
