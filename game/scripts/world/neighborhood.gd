@@ -5,6 +5,7 @@ const STORE_DOOR := Vector2(170, 174)
 const APARTMENT_DOOR := Vector2(765, 174)
 const JOB_SITE := Vector2(300, 220)
 const RESIDENT_SHEET := preload("res://assets/sprites/residents.svg")
+const INVENTORY_PANEL_SCRIPT := preload("res://scripts/ui/inventory_panel.gd")
 
 var status_label: Label
 var hint_label: Label
@@ -12,6 +13,7 @@ var dialogue_label: Label
 var time_label: Label
 var inventory_label: Label
 var reputation_label: Label
+var inventory_panel: CanvasLayer
 var npcs: Array[Dictionary] = []
 var _last_schedule_minute := -1
 var mission_choice_pending := false
@@ -25,6 +27,8 @@ func _ready() -> void:
     if player:
         player.global_position = GameState.previous_world_position
     _build_hud()
+    inventory_panel = INVENTORY_PANEL_SCRIPT.new()
+    add_child(inventory_panel)
     _sync_npc_schedules()
     _refresh_hud()
     if GameState.player_health <= 0:
@@ -115,6 +119,12 @@ func _build_hud() -> void:
     inventory_label = _make_label(Vector2(18, 72), 12, Color("#a9c8c9"))
     reputation_label = _make_label(Vector2(18, 96), 12, Color("#d6c69a"))
     dialogue_label = _make_label(Vector2(18, 485), 14, Color("#f3d59b"))
+    var bag_button := Button.new()
+    bag_button.text = "BAG  [I]"
+    bag_button.position = Vector2(820, 48)
+    bag_button.custom_minimum_size = Vector2(112, 34)
+    bag_button.pressed.connect(_toggle_inventory)
+    add_child(bag_button)
 
 func _make_label(label_position: Vector2, font_size: int, font_color: Color) -> Label:
     var label := Label.new()
@@ -172,7 +182,7 @@ func _unhandled_input(event: InputEvent) -> void:
         KEY_H:
             _use_consumable("medkit")
         KEY_I:
-            _show_inventory()
+            _toggle_inventory()
         KEY_ESCAPE:
             dialogue_label.text = ""
 
@@ -312,6 +322,10 @@ func _use_consumable(item_id: String) -> void:
         SaveManager.save_game()
     else:
         dialogue_label.text = "No usable %s in your bag, or your health is already full." % item_id
+
+func _toggle_inventory() -> void:
+    if inventory_panel:
+        inventory_panel.toggle()
 
 func _show_inventory() -> void:
     var lines: Array[String] = []
