@@ -36,6 +36,9 @@ func add_item(item_id: String, amount: int = 1) -> bool:
     if get_inventory_count() + amount > INVENTORY_CAPACITY:
         return false
     inventory[item_id] = int(inventory.get(item_id, 0)) + amount
+    # Inventory listeners (HUD, shop UI, future equipment screens) receive the
+    # authoritative post-change count; callers never need to maintain a copy.
+    EventBus.inventory_changed.emit(item_id, int(inventory[item_id]))
     return true
 
 func remove_item(item_id: String, amount: int = 1) -> bool:
@@ -46,6 +49,8 @@ func remove_item(item_id: String, amount: int = 1) -> bool:
         inventory.erase(item_id)
     else:
         inventory[item_id] = remaining
+    # Emit zero when the last copy is removed so UI can clear stale entries.
+    EventBus.inventory_changed.emit(item_id, remaining)
     return true
 
 func get_inventory_count() -> int:
