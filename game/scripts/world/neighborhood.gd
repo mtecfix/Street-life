@@ -63,6 +63,23 @@ func _draw() -> void:
     draw_string(ThemeDB.fallback_font, Vector2(670, 120), "APARTMENTS", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#d2e1e7"))
     draw_string(ThemeDB.fallback_font, Vector2(670, 430), "COMMUNITY COURT", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color.WHITE)
 
+    # Traffic is simulated by the persistent autoload, not this scene.
+    var signal_state := WorldSimulation.get_traffic_signal_state()
+    draw_circle(Vector2(430, 185), 5.0, Color("#57c978") if signal_state == "horizontal" else Color("#bd4545"))
+    draw_circle(Vector2(520, 270), 5.0, Color("#57c978") if signal_state == "vertical" else Color("#bd4545"))
+    for vehicle in WorldSimulation.get_traffic_snapshot():
+        var vehicle_position: Vector2 = vehicle["position"]
+        var vehicle_length := float(vehicle["length"])
+        var vehicle_color: Color = vehicle["color"]
+        if str(vehicle["axis"]) == "horizontal":
+            draw_rect(Rect2(vehicle_position - Vector2(vehicle_length * 0.5, 7.0), Vector2(vehicle_length, 14.0)), vehicle_color)
+            draw_rect(Rect2(vehicle_position - Vector2(5.0, 5.0), Vector2(10.0, 10.0)), Color("#b9c9cc"))
+        else:
+            draw_rect(Rect2(vehicle_position - Vector2(7.0, vehicle_length * 0.5), Vector2(14.0, vehicle_length)), vehicle_color)
+            draw_rect(Rect2(vehicle_position - Vector2(5.0, 5.0), Vector2(10.0, 10.0)), Color("#b9c9cc"))
+        if bool(vehicle["stopped"]):
+            draw_circle(vehicle_position + (Vector2(-vehicle_length * 0.5, 0) if str(vehicle["axis"]) == "horizontal" else Vector2(0, -vehicle_length * 0.5)), 2.0, Color("#e75d50"))
+
     # Ambient pedestrians are independent background agents. Their route
     # positions come from persistent world time, not scene-local movement.
     for pedestrian in WorldSimulation.get_ambient_pedestrians():
