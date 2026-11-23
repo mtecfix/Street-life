@@ -19,6 +19,9 @@ var enemy_style := "pressure"
 var enemy_decision_timer := 0.0
 var enemy_orbit_direction := 1.0
 var enemy_attack_cooldown_timer := 0.0
+var enemy_attack_sequence := 0
+var enemy_attack_kind := "quick"
+var enemy_feint_active := false
 var enemy_name := "Corner challenger"
 var enemy_color := Color("#d66a55")
 var enemy_health := 100.0
@@ -258,12 +261,14 @@ func _process(delta: float) -> void:
         telegraph.position = enemy.position
         telegraph.visible = true
         if telegraph_timer <= 0.0:
-            _resolve_enemy_attack()
+            if enemy_feint_active:
+                _resolve_enemy_feint()
+            else:
+                _resolve_enemy_attack()
     elif enemy_recovery <= 0.0 and enemy_attack_cooldown_timer <= 0.0 and distance <= enemy_attack_range:
         telegraph_timer = enemy_windup
         telegraph.position = enemy.position
-        telegraph.visible = true
-        _set_status(_enemy_telegraph_message())
+        _start_enemy_telegraph()
     else:
         telegraph.visible = false
 
@@ -296,6 +301,36 @@ func _update_enemy_positioning(delta: float, distance: float) -> void:
             movement = to_player
     if movement != Vector2.ZERO:
         enemy.position += movement.normalized() * enemy_speed * delta
+
+func _start_enemy_telegraph() -> void:
+    enemy_attack_sequence += 1
+    enemy_feint_active = enemy_style == "runner" and enemy_attack_sequence % 3 == 0
+    var heavy_interval := 3 if enemy_style == "guard" else 4
+    enemy_attack_kind = "heavy" if not enemy_feint_active and enemy_attack_sequence % heavy_interval == 0 else "quick"
+    var windup_scale := 1.35 if enemy_attack_kind == "heavy" else 1.0
+    if enemy_feint_active:
+        windup_scale = 0.62
+    telegraph_timer = enemy_windup * windup_scale
+    telegraph.position = enemy.position
+    telegraph.color = Color(1.0, 0.55, 0.12, 0.32) if enemy_attack_kind == "heavy" else Color(0.95, 0.22, 0.18, 0.25)
+    telegraph.visible = true
+    if enemy_feint_active:
+        _set_status("%s shows a rush — don't dodge too early!" % enemy_name)
+    elif enemy_attack_kind == "heavy":
+        _set_status("%s loads a HEAVY strike — create distance!" % enemy_name)
+    else:
+        _set_status(_enemy_telegraph_message())
+
+func _resolve_enemy_feint() -> void:
+    # The runner sells an attack, then pulls out. The tell is intentionally
+    # shorter than a real attack and deals no damage; punish the recovery.
+    telegraph_timer = -1.0
+    enemy_feint_active = false
+    telegraph.visible = false
+    enemy_attack_cooldown_timer = 0.45
+    enemy_recovery = 0.42
+    enemy.position += (enemy.position - player.position).normalized() * 34.0
+    _set_status("%s pulled the feint. Stay ready and close the gap!" % enemy_name)
 
 func _enemy_telegraph_message() -> String:
     match enemy_style:
@@ -415,22 +450,27 @@ func _dodge() -> void:
 func _resolve_enemy_attack() -> void:
     telegraph_timer = -1.0
     telegraph.visible = false
+    enemy_feint_active = false
     enemy_attack_cooldown_timer = 1.0 if enemy_style == "runner" else 1.35
     enemy_recovery = 0.85 if enemy_style == "pressure" else 1.1
     var to_player := (player.position - enemy.position).normalized()
     if enemy_style == "runner":
         # The alley runner commits to a short rush at the end of its warning.
         enemy.position += to_player * 42.0
-    var effective_range := enemy_attack_range + (38.0 if enemy_style == "runner" else 20.0)
+    var is_heavy := enemy_attack_kind == "heavy"
+    var effective_range := enemy_attack_range + (38.0 if enemy_style == "runner" else 20.0) + (18.0 if is_heavy else 0.0)
+    var attack_damage := enemy_damage * (1.55 if is_heavy else 1.0)
+    var knockback := 225.0 if is_heavy else (190.0 if enemy_style == "runner" else 155.0)
     if player.position.distance_to(enemy.position) <= effective_range and invulnerability_timer <= 0.0:
-        player_health = maxf(0.0, player_health - enemy_damage)
-        player_knockback_velocity = (player.position - enemy.position).normalized() * (190.0 if enemy_style == "runner" else 155.0)
+        player_health = maxf(0.0, player_health - attack_damage)
+        player_knockback_velocity = (player.position - enemy.position).normalized() * knockback
         GameState.player_health = int(player_health)
-        _set_status("You took a hit. Use SHIFT to dodge the next warning.")
+        _set_status("HEAVY STRIKE LANDED — %d damage!" % roundi(attack_damage) if is_heavy else "You took a hit. Use SHIFT to dodge the next warning.")
         if player_health <= 0.0:
             _lose_encounter()
     else:
         _set_status("Opponent missed. Counter while there is an opening.")
+    enemy_attack_kind = "quick"
 
 func _win_encounter() -> void:
     finished = true
