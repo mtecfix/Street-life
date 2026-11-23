@@ -73,7 +73,8 @@ func _purchase(item_id: String) -> void:
     if GameState.purchase_item(item_id):
         var item: Dictionary = GameState.ITEM_DEFINITIONS[item_id]
         status_label.text = "Purchased %s for $%d." % [str(item["name"]), int(item["price"])]
-        EventBus.inventory_changed.emit(item_id, int(GameState.inventory[item_id]))
+        # GameState.purchase_item() emits the authoritative inventory update.
+        # Do not emit here as well, or HUD listeners receive duplicate events.
         SaveManager.save_game()
     else:
         status_label.text = "Can't buy that. Check your cash and bag capacity."
