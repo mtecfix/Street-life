@@ -26,6 +26,12 @@ func _run() -> void:
     _check(combat.enemy_hitstun_timer >= 0.16, "A landed hit should briefly stun the enemy.")
     _check(combat.enemy_knockback_velocity.x > 0.0, "The enemy should be pushed away from the player.")
     _check(combat.hit_flash_timer > 0.0, "A landed hit should trigger visual impact feedback.")
+    _check(combat.enemy_recoil_timer > 0.0, "A landed hit should trigger a visible recoil pose.")
+    _check(combat.enemy_swing_timer == 0.0, "A hit should interrupt the enemy's active attack animation.")
+    combat.player_swing_duration = 0.18
+    combat.player_swing_timer = combat.player_swing_duration
+    combat._update_combat_animation()
+    _check(combat.player.scale.x > 1.0, "The player attack animation should visibly wind into its strike.")
 
     combat.player.position = Vector2(400, 270)
     combat.enemy.position = Vector2(450, 270)
@@ -34,6 +40,8 @@ func _run() -> void:
     combat._resolve_enemy_attack()
     _check(combat.player_health == 82.0, "A successful enemy strike should apply its damage.")
     _check(combat.player_knockback_velocity.x < 0.0, "A successful enemy strike should push the player away.")
+    _check(combat.player_hit_flash_timer > 0.0, "A successful enemy strike should trigger player hit feedback.")
+    _check(combat.enemy_swing_timer > 0.0, "An enemy attack should trigger its own strike animation.")
 
     combat.queue_free()
     if _failures.is_empty():
