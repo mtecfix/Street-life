@@ -63,6 +63,13 @@ func _draw() -> void:
     draw_string(ThemeDB.fallback_font, Vector2(670, 120), "APARTMENTS", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#d2e1e7"))
     draw_string(ThemeDB.fallback_font, Vector2(670, 430), "COMMUNITY COURT", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color.WHITE)
 
+    # Ambient pedestrians are independent background agents. Their route
+    # positions come from persistent world time, not scene-local movement.
+    for pedestrian in WorldSimulation.get_ambient_pedestrians():
+        var pedestrian_position: Vector2 = pedestrian["position"]
+        var pedestrian_frame := int(pedestrian["sprite"])
+        draw_texture_rect_region(RESIDENT_SHEET, Rect2(pedestrian_position - Vector2(11, 16), Vector2(22, 30)), Rect2(pedestrian_frame * 32, 0, 32, 40))
+
     for npc in npcs:
         if not bool(npc["active"]):
             continue
