@@ -25,6 +25,10 @@ var attack_cooldown := 0.0
 var combo_step := 0
 var combo_window_timer := 0.0
 var enemy_recovery := 0.0
+var enemy_hitstun_timer := 0.0
+var enemy_knockback_velocity := Vector2.ZERO
+var player_knockback_velocity := Vector2.ZERO
+var hit_flash_timer := 0.0
 var telegraph_timer := -1.0
 var dodge_timer := 0.0
 var invulnerability_timer := 0.0
@@ -209,6 +213,8 @@ func _process(delta: float) -> void:
     if combo_window_timer <= 0.0:
         combo_step = 0
     enemy_recovery = maxf(0.0, enemy_recovery - delta)
+    enemy_hitstun_timer = maxf(0.0, enemy_hitstun_timer - delta)
+    hit_flash_timer = maxf(0.0, hit_flash_timer - delta)
     invulnerability_timer = maxf(0.0, invulnerability_timer - delta)
     stamina = minf(stamina_max, stamina + GameState.get_stamina_regen() * delta)
 
@@ -218,13 +224,17 @@ func _process(delta: float) -> void:
     else:
         var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down")
         player.position += direction * GameState.get_player_speed() * delta
+    player.position += player_knockback_velocity * delta
+    player_knockback_velocity = player_knockback_velocity.move_toward(Vector2.ZERO, 720.0 * delta)
 
     var horizontal_margin := 210.0 if environment_kind == "alley" else 38.0
     player.position.x = clampf(player.position.x, horizontal_margin, ARENA_SIZE.x - horizontal_margin)
     player.position.y = clampf(player.position.y, 205.0, 445.0)
 
     var distance := enemy.position.distance_to(player.position)
-    if distance > 61.0:
+    enemy.position += enemy_knockback_velocity * delta
+    enemy_knockback_velocity = enemy_knockback_velocity.move_toward(Vector2.ZERO, 620.0 * delta)
+    if enemy_hitstun_timer <= 0.0 and distance > 61.0:
         enemy.position = enemy.position.move_toward(player.position, enemy_speed * delta)
 
     if telegraph_timer >= 0.0:
@@ -242,6 +252,7 @@ func _process(delta: float) -> void:
         telegraph.visible = false
 
     player.modulate = Color(1.0, 1.0, 1.0, 0.45 if invulnerability_timer > 0.0 and int(Time.get_ticks_msec() / 80) % 2 == 0 else 1.0)
+    enemy.modulate = Color("#fff0c2") if hit_flash_timer > 0.0 else enemy_color
     _refresh()
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -275,8 +286,7 @@ func _attack() -> void:
     attack_cooldown = 0.42
     combo_step = (combo_step + 1) % 3
     combo_window_timer = 0.85
-    enemy_health = maxf(0.0, enemy_health - damage)
-    enemy.modulate = Color("#ffffff")
+    _apply_enemy_hit(damage, 135.0, 0.16)
     if enemy_health <= 0.0:
         _win_encounter()
     else:
@@ -303,8 +313,7 @@ func _heavy_attack() -> void:
     combo_step = 0
     combo_window_timer = 0.0
     var damage := get_heavy_attack_damage(GameState.get_attack_damage())
-    enemy_health = maxf(0.0, enemy_health - damage)
-    enemy.modulate = Color("#ffffff")
+    _apply_enemy_hit(damage, 220.0, 0.26)
 
     var interrupted := telegraph_timer >= 0.0
     if interrupted:
@@ -318,6 +327,19 @@ func _heavy_attack() -> void:
         _set_status("HEAVY HIT — %d damage. You interrupted the incoming strike!" % damage)
     else:
         _set_status("HEAVY HIT — %d damage. Recover your stamina." % damage)
+
+func _apply_enemy_hit(damage: int, knockback_strength: float, stun_duration: float) -> void:
+    # Hit reaction is separated from damage math so light/heavy attacks and
+    # future enemy types share one consistent impact response.
+    enemy_health = maxf(0.0, enemy_health - damage)
+    var away_direction := (enemy.position - player.position).normalized()
+    if away_direction == Vector2.ZERO:
+        away_direction = Vector2.RIGHT
+    enemy_knockback_velocity = away_direction * knockback_strength
+    enemy_hitstun_timer = maxf(enemy_hitstun_timer, stun_duration)
+    hit_flash_timer = 0.12
+    if enemy_health <= 0.0:
+        _win_encounter()
 
 func get_combo_damage(base_damage: int, combo_index: int) -> int:
     var multipliers := [1.0, 1.15, 1.35]
@@ -347,6 +369,7 @@ func _resolve_enemy_attack() -> void:
     enemy_recovery = 1.05
     if player.position.distance_to(enemy.position) <= enemy_attack_range + 20.0 and invulnerability_timer <= 0.0:
         player_health = maxf(0.0, player_health - enemy_damage)
+        player_knockback_velocity = (player.position - enemy.position).normalized() * 155.0
         GameState.player_health = int(player_health)
         _set_status("You took a hit. Use SHIFT to dodge the next warning.")
         if player_health <= 0.0:
