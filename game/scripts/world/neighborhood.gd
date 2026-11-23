@@ -80,6 +80,12 @@ func _draw() -> void:
         if bool(vehicle["stopped"]):
             draw_circle(vehicle_position + (Vector2(-vehicle_length * 0.5, 0) if str(vehicle["axis"]) == "horizontal" else Vector2(0, -vehicle_length * 0.5)), 2.0, Color("#e75d50"))
 
+    # Maya's Market foot traffic is part of the persistent city simulation.
+    for customer in WorldSimulation.get_business_visitors():
+        var customer_position: Vector2 = customer["position"]
+        var customer_frame := int(customer["sprite"])
+        draw_texture_rect_region(RESIDENT_SHEET, Rect2(customer_position - Vector2(9, 13), Vector2(18, 26)), Rect2(customer_frame * 32, 0, 32, 40))
+
     # Ambient pedestrians are independent background agents. Their route
     # positions come from persistent world time, not scene-local movement.
     for pedestrian in WorldSimulation.get_ambient_pedestrians():
