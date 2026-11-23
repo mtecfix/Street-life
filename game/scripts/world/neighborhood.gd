@@ -80,6 +80,12 @@ func _draw() -> void:
         if bool(vehicle["stopped"]):
             draw_circle(vehicle_position + (Vector2(-vehicle_length * 0.5, 0) if str(vehicle["axis"]) == "horizontal" else Vector2(0, -vehicle_length * 0.5)), 2.0, Color("#e75d50"))
 
+    # Tasha works the market counter during the daytime shift.
+    var market_state := WorldSimulation.get_business_snapshot("mayas_market")
+    if bool(market_state.get("employee_on_shift", false)):
+        draw_texture_rect_region(RESIDENT_SHEET, Rect2(Vector2(170, 174) - Vector2(10, 15), Vector2(20, 30)), Rect2(4 * 32, 0, 32, 40))
+        draw_string(ThemeDB.fallback_font, Vector2(181, 163), "TASHA", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#f1d8aa"))
+
     # Maya's Market foot traffic is part of the persistent city simulation.
     for customer in WorldSimulation.get_business_visitors():
         var customer_position: Vector2 = customer["position"]
