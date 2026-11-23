@@ -338,8 +338,6 @@ func _apply_enemy_hit(damage: int, knockback_strength: float, stun_duration: flo
     enemy_knockback_velocity = away_direction * knockback_strength
     enemy_hitstun_timer = maxf(enemy_hitstun_timer, stun_duration)
     hit_flash_timer = 0.12
-    if enemy_health <= 0.0:
-        _win_encounter()
 
 func get_combo_damage(base_damage: int, combo_index: int) -> int:
     var multipliers := [1.0, 1.15, 1.35]
