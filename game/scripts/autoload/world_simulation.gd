@@ -48,6 +48,39 @@ const AMBIENT_PEDESTRIANS := [
     {"id": "walker_08", "sprite": 1, "start": 900, "end": 1380, "from": Vector2(900, 350), "to": Vector2(540, 350), "phase": 0.76}
 ]
 
+## Storefront foot traffic is derived from the world clock, so customers
+## remain present at the correct point in their shopping trip after scene changes.
+const BUSINESS_VISITORS := [
+    {"id": "market_customer_01", "sprite": 2, "start": 390, "end": 1260, "period": 95, "phase": 12, "from": Vector2(115, 184), "to": Vector2(245, 184)},
+    {"id": "market_customer_02", "sprite": 4, "start": 420, "end": 1200, "period": 130, "phase": 58, "from": Vector2(245, 190), "to": Vector2(115, 190)},
+    {"id": "market_customer_03", "sprite": 3, "start": 540, "end": 1320, "period": 155, "phase": 91, "from": Vector2(135, 210), "to": Vector2(255, 210)}
+]
+
+func get_business_visitors() -> Array[Dictionary]:
+    var visitors: Array[Dictionary] = []
+    var minute_of_day := WorldClock.total_minutes % 1440
+    var market := get_business_snapshot("mayas_market")
+    if not bool(market.get("open", false)):
+        return visitors
+    for profile in BUSINESS_VISITORS:
+        var start := int(profile["start"])
+        var finish := int(profile["end"])
+        if minute_of_day < start or minute_of_day >= finish:
+            continue
+        var elapsed := minute_of_day - start + int(profile["phase"])
+        var period := maxi(1, int(profile["period"]))
+        var cycle_progress := posmod(elapsed, period)
+        var progress := float(cycle_progress) / float(period)
+        var origin: Vector2 = profile["from"]
+        var destination: Vector2 = profile["to"]
+        visitors.append({
+            "id": str(profile["id"]),
+            "sprite": int(profile["sprite"]),
+            "position": origin.lerp(destination, progress)
+        })
+    return visitors
+
+
 func get_ambient_pedestrians() -> Array[Dictionary]:
     var pedestrians: Array[Dictionary] = []
     var minute_of_day := WorldClock.total_minutes % 1440
