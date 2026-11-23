@@ -67,11 +67,72 @@ func get_ambient_pedestrians() -> Array[Dictionary]:
         })
     return pedestrians
 
+
+## Lightweight traffic agents advance continuously in this autoload, including
+## while the neighborhood scene is not loaded. Positions are reconstructed from
+## elapsed simulation time, so scene reloads do not reset vehicle movement.
+const TRAFFIC_VEHICLES := [
+    {"id": "cab_east", "axis": "horizontal", "lane": 225.0, "start": -80.0, "speed": 46.0, "length": 31.0, "color": Color("#d8b23e"), "active_start": 360, "active_end": 1380},
+    {"id": "sedan_west", "axis": "horizontal", "lane": 315.0, "start": 1020.0, "speed": -39.0, "length": 29.0, "color": Color("#477c9b"), "active_start": 360, "active_end": 1380},
+    {"id": "delivery_east", "axis": "horizontal", "lane": 245.0, "start": -420.0, "speed": 34.0, "length": 38.0, "color": Color("#a9a69a"), "active_start": 420, "active_end": 1260},
+    {"id": "van_west", "axis": "horizontal", "lane": 295.0, "start": 1280.0, "speed": -31.0, "length": 40.0, "color": Color("#6d8a68"), "active_start": 420, "active_end": 1260},
+    {"id": "compact_south", "axis": "vertical", "lane": 385.0, "start": -180.0, "speed": 35.0, "length": 28.0, "color": Color("#9b6470"), "active_start": 420, "active_end": 1320},
+    {"id": "taxi_north", "axis": "vertical", "lane": 485.0, "start": 760.0, "speed": -43.0, "length": 31.0, "color": Color("#d8b23e"), "active_start": 420, "active_end": 1320}
+]
+
+var _traffic_elapsed_seconds := 0.0
+
+func get_traffic_signal_state() -> String:
+    var phase := fposmod(_traffic_elapsed_seconds, 24.0)
+    return "horizontal" if phase < 13.0 else "vertical"
+
+func get_traffic_snapshot() -> Array[Dictionary]:
+    var vehicles: Array[Dictionary] = []
+    var minute_of_day := WorldClock.total_minutes % 1440
+    var signal_state := get_traffic_signal_state()
+    var signal_phase := fposmod(_traffic_elapsed_seconds, 24.0)
+    for profile in TRAFFIC_VEHICLES:
+        if minute_of_day < int(profile["active_start"]) or minute_of_day >= int(profile["active_end"]):
+            continue
+        var axis := str(profile["axis"])
+        var lane := float(profile["lane"])
+        var speed := float(profile["speed"])
+        var start := float(profile["start"])
+        var distance := absf(speed) * _traffic_elapsed_seconds
+        var position: Vector2
+        var stopped := false
+        if axis == "horizontal":
+            var x := fposmod(start + speed * _traffic_elapsed_seconds + 80.0, 1120.0) - 80.0
+            var approaches_intersection := (speed > 0.0 and x < 435.0 and x > 397.0) or (speed < 0.0 and x > 435.0 and x < 473.0)
+            stopped = approaches_intersection and signal_state != "horizontal"
+            if stopped:
+                x = 397.0 if speed > 0.0 else 473.0
+            position = Vector2(x, lane)
+        else:
+            var y := fposmod(start + speed * _traffic_elapsed_seconds + 80.0, 700.0) - 80.0
+            var approaches_intersection := (speed > 0.0 and y < 270.0 and y > 232.0) or (speed < 0.0 and y > 270.0 and y < 308.0)
+            stopped = approaches_intersection and signal_state != "vertical"
+            if stopped:
+                y = 232.0 if speed > 0.0 else 308.0
+            position = Vector2(lane, y)
+        vehicles.append({
+            "id": str(profile["id"]),
+            "position": position,
+            "axis": axis,
+            "length": float(profile["length"]),
+            "color": profile["color"],
+            "stopped": stopped
+        })
+    return vehicles
+
 var _last_activity_level := -1
 
 func _ready() -> void:
     EventBus.world_time_advanced.connect(_on_world_time_advanced)
     _refresh_business_simulation()
+
+func _process(delta: float) -> void:
+    _traffic_elapsed_seconds += delta
 
 func get_resident_snapshot(resident_id: String) -> Dictionary:
     if not RESIDENTS.has(resident_id):
