@@ -1,12 +1,27 @@
 [gd_scene load_steps=2 format=3]
 
+# TITLE SCREEN SCENE
+# This is the lightweight scene resource used as the game's front-end entry
+# screen. It intentionally contains only a full-viewport Control root and its
+# attached script. The script creates the background and menu Controls at
+# runtime, keeping layout and button behavior together in title_screen.gd.
+#
+# The root Control stretches to the available viewport. This allows the
+# procedural background and centered menu to adapt to the active window size.
+# Keep this scene free of gameplay/world nodes; the menu hands off to the
+# Neighborhood scene through SceneManager when the player makes a selection.
+
 [ext_resource type="Script" path="res://scripts/boot/title_screen.gd" id="1"]
 
 [node name="TitleScreen" type="Control"]
+# Use the full-rect anchor preset so the root Control covers the entire viewport.
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+# Grow with the viewport on both axes when the parent/container is resized.
 grow_horizontal = 2
 grow_vertical = 2
+# Script draws the background, builds the menu, checks save availability,
+# and routes the selected action into the game world.
 script = ExtResource("1")
