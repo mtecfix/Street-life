@@ -81,45 +81,89 @@ const TRAFFIC_VEHICLES := [
 ]
 
 var _traffic_elapsed_seconds := 0.0
+var _traffic_positions: Dictionary = {}
+var _traffic_stopped: Dictionary = {}
 
 func get_traffic_signal_state() -> String:
     var phase := fposmod(_traffic_elapsed_seconds, 24.0)
     return "horizontal" if phase < 13.0 else "vertical"
 
+func _initialize_traffic() -> void:
+    for profile in TRAFFIC_VEHICLES:
+        var vehicle_id := str(profile["id"])
+        _traffic_positions[vehicle_id] = float(profile["start"])
+        _traffic_stopped[vehicle_id] = false
+
+func _advance_traffic(delta: float) -> void:
+    var signal_state := get_traffic_signal_state()
+    for profile in TRAFFIC_VEHICLES:
+        var vehicle_id := str(profile["id"])
+        var axis := str(profile["axis"])
+        var speed := float(profile["speed"])
+        var current := float(_traffic_positions.get(vehicle_id, float(profile["start"])))
+        var candidate := current + speed * delta
+        var stop_line := 0.0
+        var crossing_red := false
+        if axis == "horizontal":
+            stop_line = 397.0 if speed > 0.0 else 473.0
+            crossing_red = signal_state != "horizontal"
+        else:
+            stop_line = 232.0 if speed > 0.0 else 308.0
+            crossing_red = signal_state != "vertical"
+
+        var reached_line := (speed > 0.0 and current < stop_line and candidate >= stop_line) or (speed < 0.0 and current > stop_line and candidate <= stop_line)
+        var stopped := false
+        if crossing_red and reached_line:
+            candidate = stop_line
+            stopped = true
+        elif crossing_red and is_equal_approx(current, stop_line):
+            candidate = stop_line
+            stopped = true
+
+        # Maintain following distance when vehicles share a lane and direction.
+        for other_profile in TRAFFIC_VEHICLES:
+            if str(other_profile["id"]) == vehicle_id:
+                continue
+            if str(other_profile["axis"]) != axis or not is_equal_approx(float(other_profile["lane"]), float(profile["lane"])):
+                continue
+            if signf(float(other_profile["speed"])) != signf(speed):
+                continue
+            var other_position := float(_traffic_positions.get(str(other_profile["id"]), float(other_profile["start"])))
+            var gap := absf(other_position - candidate)
+            if speed > 0.0 and other_position > current and other_position > candidate and gap < float(profile["length"]) + 12.0:
+                candidate = other_position - float(profile["length"]) - 12.0
+                stopped = true
+            elif speed < 0.0 and other_position < current and other_position < candidate and gap < float(profile["length"]) + 12.0:
+                candidate = other_position + float(profile["length"]) + 12.0
+                stopped = true
+
+        var route_limit := 1040.0 if axis == "horizontal" else 620.0
+        var route_minimum := -80.0
+        if speed > 0.0 and candidate > route_limit:
+            candidate = route_minimum
+        elif speed < 0.0 and candidate < route_minimum:
+            candidate = route_limit
+        _traffic_positions[vehicle_id] = candidate
+        _traffic_stopped[vehicle_id] = stopped
+
 func get_traffic_snapshot() -> Array[Dictionary]:
     var vehicles: Array[Dictionary] = []
     var minute_of_day := WorldClock.total_minutes % 1440
-    var signal_state := get_traffic_signal_state()
     for profile in TRAFFIC_VEHICLES:
         if minute_of_day < int(profile["active_start"]) or minute_of_day >= int(profile["active_end"]):
             continue
+        var vehicle_id := str(profile["id"])
         var axis := str(profile["axis"])
         var lane := float(profile["lane"])
-        var speed := float(profile["speed"])
-        var start := float(profile["start"])
-        var position: Vector2
-        var stopped := false
-        if axis == "horizontal":
-            var x := fposmod(start + speed * _traffic_elapsed_seconds + 80.0, 1120.0) - 80.0
-            var approaches_intersection := (speed > 0.0 and x >= 397.0) or (speed < 0.0 and x <= 473.0)
-            stopped = approaches_intersection and signal_state != "horizontal"
-            if stopped:
-                x = 397.0 if speed > 0.0 else 473.0
-            position = Vector2(x, lane)
-        else:
-            var y := fposmod(start + speed * _traffic_elapsed_seconds + 80.0, 700.0) - 80.0
-            var approaches_intersection := (speed > 0.0 and y >= 232.0) or (speed < 0.0 and y <= 308.0)
-            stopped = approaches_intersection and signal_state != "vertical"
-            if stopped:
-                y = 232.0 if speed > 0.0 else 308.0
-            position = Vector2(lane, y)
+        var route_position := float(_traffic_positions.get(vehicle_id, float(profile["start"])))
+        var position := Vector2(route_position, lane) if axis == "horizontal" else Vector2(lane, route_position)
         vehicles.append({
-            "id": str(profile["id"]),
+            "id": vehicle_id,
             "position": position,
             "axis": axis,
             "length": float(profile["length"]),
             "color": profile["color"],
-            "stopped": stopped
+            "stopped": bool(_traffic_stopped.get(vehicle_id, false))
         })
     return vehicles
 
@@ -127,10 +171,12 @@ var _last_activity_level := -1
 
 func _ready() -> void:
     EventBus.world_time_advanced.connect(_on_world_time_advanced)
+    _initialize_traffic()
     _refresh_business_simulation()
 
 func _process(delta: float) -> void:
     _traffic_elapsed_seconds += delta
+    _advance_traffic(delta)
 
 func get_resident_snapshot(resident_id: String) -> Dictionary:
     if not RESIDENTS.has(resident_id):
