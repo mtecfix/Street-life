@@ -458,8 +458,8 @@ func _build_environment_props() -> void:
             ]
         "alley":
             environment_props = [
-                {"name": "Trash bags", "position": Vector2(242, 278), "health": 1, "kind": "trash"},
-                {"name": "Loose pallet", "position": Vector2(718, 365), "health": 2, "kind": "pallet"}
+                {"name": "Trash bags", "position": Vector2(360, 350), "health": 1, "kind": "trash"},
+                {"name": "Loose pallet", "position": Vector2(620, 350), "health": 2, "kind": "pallet"}
             ]
         _:
             environment_props = [
