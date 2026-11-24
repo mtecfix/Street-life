@@ -56,6 +56,30 @@ const BUSINESS_VISITORS := [
     {"id": "market_customer_03", "sprite": 3, "start": 540, "end": 1320, "period": 155, "phase": 91, "from": Vector2(135, 210), "to": Vector2(255, 210)}
 ]
 
+
+## Supplier deliveries use the same 24-hour clock as business inventory.
+## The van arrives before opening and a worker unloads at the storefront.
+func get_business_delivery_snapshot(business_id: String) -> Dictionary:
+    if business_id != "mayas_market":
+        return {}
+    var minute_of_day := WorldClock.total_minutes % 1440
+    var delivery_start := 330
+    var delivery_finish := 360
+    if minute_of_day < delivery_start or minute_of_day >= delivery_finish:
+        return {"active": false, "position": Vector2.ZERO, "worker_position": Vector2.ZERO}
+    var progress := float(minute_of_day - delivery_start) / float(delivery_finish - delivery_start)
+    var van_position := Vector2(-55.0, 225.0).lerp(Vector2(135.0, 225.0), minf(progress * 1.35, 1.0))
+    var worker_progress := clampf((progress - 0.35) / 0.65, 0.0, 1.0)
+    var worker_position := Vector2(135.0, 225.0).lerp(Vector2(170.0, 184.0), worker_progress)
+    return {
+        "active": true,
+        "position": van_position,
+        "worker_position": worker_position,
+        "unloading": progress >= 0.35,
+        "progress": progress
+    }
+
+
 func get_business_visitors() -> Array[Dictionary]:
     var visitors: Array[Dictionary] = []
     var minute_of_day := WorldClock.total_minutes % 1440
@@ -280,14 +304,12 @@ func _refresh_business_simulation() -> void:
     var stored_day := int(business_state.get("day", current_day))
     var last_hour := int(business_state.get("last_simulated_hour", -1))
     if stored_day != current_day:
-        business_state = {
-            "day": current_day,
-            "customers_today": 0,
-            "last_simulated_hour": -1,
-            "stock": {"snack": 12, "medkit": 5, "soda": 16},
-            "last_restock_day": current_day
-        }
-        last_hour = -1
+        # Carry unsold inventory overnight. The morning supplier delivery,
+        # rather than the day rollover itself, replenishes the storefront.
+        business_state["day"] = current_day
+        business_state["customers_today"] = 0
+        business_state["last_simulated_hour"] = current_hour_stamp - 1
+        last_hour = current_hour_stamp - 1
     if not business_state.has("stock"):
         business_state["stock"] = {"snack": 12, "medkit": 5, "soda": 16}
     if not business_state.has("last_restock_day"):
