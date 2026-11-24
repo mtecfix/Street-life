@@ -50,10 +50,25 @@ func _draw() -> void:
     _draw_block_building(Vector2(70, 55), Vector2(205, 105), Color("#8b7660"), Color("#51443e"), Color("#b28d69"), 3)
     _draw_block_building(Vector2(650, 55), Vector2(230, 105), Color("#78838b"), Color("#424b52"), Color("#a9b4b8"), 4)
     _draw_block_building(Vector2(665, 390), Vector2(205, 95), Color("#897967"), Color("#4c4540"), Color("#b09a7d"), 3)
+    _draw_storefront_facades()
+    _draw_fire_escape(Vector2(842, 55))
+    _draw_court_fence()
+    _draw_parking_details()
+    _draw_utility_poles_and_wires()
+    _draw_property_boundaries()
+    _draw_alley_service_area()
+    _draw_loading_zone()
+    _draw_building_rooftops()
     _draw_polygon([Vector2(292, 360), Vector2(342, 360), Vector2(342, 505), Vector2(292, 505)], Color("#4c5a4f"))
     _draw_polygon([Vector2(286, 350), Vector2(348, 350), Vector2(342, 363), Vector2(292, 363)], Color("#9b8a6d"))
     _draw_polygon([STORE_DOOR + Vector2(-15, -8), STORE_DOOR + Vector2(15, -8), STORE_DOOR + Vector2(19, 8), STORE_DOOR + Vector2(-19, 8)], Color("#d9b66e"))
     _draw_polygon([APARTMENT_DOOR + Vector2(-15, -8), APARTMENT_DOOR + Vector2(15, -8), APARTMENT_DOOR + Vector2(19, 8), APARTMENT_DOOR + Vector2(-19, 8)], Color("#8ec2d1"))
+
+    # Street dressing is deliberately drawn as a replaceable visual layer.
+    _draw_sidewalk_details()
+    _draw_street_furniture()
+    _draw_street_trees()
+    _draw_utility_fixtures()
     draw_string(ThemeDB.fallback_font, Vector2(88, 92), "MAYA'S MARKET", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color.WHITE)
     draw_string(ThemeDB.fallback_font, Vector2(88, 120), "GROCERIES  /  SUPPLIES", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#f1d8aa"))
     draw_string(ThemeDB.fallback_font, Vector2(670, 92), "THE WALK-UPS", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color.WHITE)
@@ -517,3 +532,269 @@ func _purchase_training(skill_id: String) -> void:
         dialogue_label.text += "  " + _training_menu_text()
     else:
         training_menu_pending = false
+
+
+func _draw_sidewalk_details() -> void:
+    # Concrete joints and curb breaks give the block readable scale.
+    for x in range(18, 345, 42):
+        draw_line(Vector2(x, 198), Vector2(x + 18, 198), Color("#a5a39a"), 2.0)
+        draw_line(Vector2(x, 347), Vector2(x + 18, 347), Color("#a5a39a"), 2.0)
+    for y in range(18, 535, 42):
+        draw_line(Vector2(352, y), Vector2(352, y + 18), Color("#a5a39a"), 2.0)
+        draw_line(Vector2(518, y), Vector2(518, y + 18), Color("#a5a39a"), 2.0)
+    # Storm drains and curb ramps.
+    _draw_polygon([
+        Vector2(548, 337), Vector2(590, 337), Vector2(590, 344), Vector2(548, 344)
+    ], Color("#30383a"), Color("#171e20"), 1.0)
+    for x in range(553, 588, 7):
+        draw_line(Vector2(x, 338), Vector2(x, 343), Color("#778184"), 1.0)
+    _draw_polygon([
+        Vector2(330, 335), Vector2(350, 335), Vector2(350, 352), Vector2(337, 352)
+    ], Color("#aaa69a"), Color("#565c5d"), 1.0)
+
+
+func _draw_street_furniture() -> void:
+    # Public bench on the lower sidewalk.
+    _draw_polygon([
+        Vector2(555, 390), Vector2(603, 390), Vector2(608, 397), Vector2(550, 397)
+    ], Color("#76563f"))
+    draw_line(Vector2(557, 399), Vector2(555, 410), Color("#303638"), 3.0)
+    draw_line(Vector2(602, 399), Vector2(605, 410), Color("#303638"), 3.0)
+    draw_line(Vector2(554, 385), Vector2(604, 385), Color("#9c7958"), 3.0)
+
+    # Sidewalk litter bin with a visible lid and front plane.
+    _draw_polygon([
+        Vector2(625, 368), Vector2(646, 368), Vector2(643, 400), Vector2(628, 400)
+    ], Color("#52635d"), Color("#252d2d"), 1.5)
+    _draw_polygon([
+        Vector2(622, 365), Vector2(648, 365), Vector2(646, 370), Vector2(624, 370)
+    ], Color("#84918a"), Color("#252d2d"), 1.0)
+    draw_line(Vector2(633, 375), Vector2(632, 394), Color("#a7b2a9"), 1.0)
+
+    # Fire hydrant beside the curb.
+    _draw_polygon([
+        Vector2(326, 374), Vector2(337, 374), Vector2(340, 382),
+        Vector2(338, 396), Vector2(325, 396), Vector2(323, 382)
+    ], Color("#bd5145"), Color("#472b2a"), 1.5)
+    draw_rect(Rect2(322, 379, 19, 5), Color("#d4775d"))
+    draw_circle(Vector2(331, 374), 6.0, Color("#d4775d"))
+
+
+func _draw_street_trees() -> void:
+    _draw_tree(Vector2(60, 385), 0.9)
+    _draw_tree(Vector2(900, 350), 1.0)
+    _draw_tree(Vector2(920, 150), 0.78)
+
+
+func _draw_tree(base: Vector2, scale_factor: float) -> void:
+    var s := scale_factor
+    _draw_polygon([
+        base + Vector2(-5, 0) * s, base + Vector2(7, 0) * s,
+        base + Vector2(9, -38) * s, base + Vector2(-3, -38) * s
+    ], Color("#66513e"), Color("#2b302b"), 1.5)
+    _draw_polygon([
+        base + Vector2(-25, -35) * s, base + Vector2(-20, -56) * s,
+        base + Vector2(-7, -66) * s, base + Vector2(12, -62) * s,
+        base + Vector2(26, -45) * s, base + Vector2(19, -28) * s,
+        base + Vector2(-2, -24) * s
+    ], Color("#49684f"), Color("#263b32"), 2.0)
+    _draw_polygon([
+        base + Vector2(-13, -49) * s, base + Vector2(-5, -62) * s,
+        base + Vector2(10, -57) * s, base + Vector2(16, -43) * s,
+        base + Vector2(2, -34) * s, base + Vector2(-12, -37) * s
+    ], Color("#66845b"), Color("#344c3b"), 1.0)
+    _draw_polygon([
+        base + Vector2(-13, 2) * s, base + Vector2(15, 2) * s,
+        base + Vector2(12, 8) * s, base + Vector2(-10, 8) * s
+    ], Color("#81735e"), Color("#383b36"), 1.0)
+
+
+func _draw_utility_fixtures() -> void:
+    # Streetlight: pole, arm, housing, and restrained glow.
+    draw_line(Vector2(55, 190), Vector2(55, 112), Color("#30383b"), 4.0)
+    draw_line(Vector2(55, 113), Vector2(76, 105), Color("#30383b"), 3.0)
+    _draw_polygon([
+        Vector2(72, 101), Vector2(88, 100), Vector2(92, 106),
+        Vector2(75, 109)
+    ], Color("#d0bd86"), Color("#343a39"), 1.0)
+    draw_circle(Vector2(83, 111), 8.0, Color(1.0, 0.82, 0.48, 0.12))
+
+    # Utility cabinet and wall-mounted service box.
+    _draw_polygon([
+        Vector2(890, 265), Vector2(914, 265), Vector2(914, 303), Vector2(890, 303)
+    ], Color("#59645e"), Color("#252d2d"), 1.5)
+    draw_line(Vector2(895, 272), Vector2(909, 272), Color("#aab0a2"), 1.0)
+    draw_circle(Vector2(907, 296), 2.0, Color("#d6bd75"))
+
+    # Short metal railing protecting the corner approach.
+    for x in range(690, 747, 14):
+        draw_line(Vector2(x, 346), Vector2(x, 372), Color("#465255"), 2.0)
+    draw_line(Vector2(686, 348), Vector2(751, 348), Color("#7e8987"), 3.0)
+
+
+func _draw_storefront_facades() -> void:
+    # Market signboard, projecting awning, and recessed service trim.
+    _draw_polygon([
+        Vector2(82, 61), Vector2(258, 61), Vector2(263, 76), Vector2(82, 76)
+    ], Color("#3b4947"), Color("#202829"), 2.0)
+    draw_line(Vector2(88, 79), Vector2(258, 79), Color("#c5a875"), 2.0)
+    _draw_polygon([
+        Vector2(78, 133), Vector2(263, 133), Vector2(270, 145), Vector2(78, 145)
+    ], Color("#8e4f42"), Color("#332b2b"), 1.5)
+    for x in range(83, 263, 30):
+        _draw_polygon([
+            Vector2(x, 134), Vector2(x + 14, 134),
+            Vector2(x + 14, 144), Vector2(x, 144)
+        ], Color("#d2b17c"), Color("#59443b"), 0.8)
+    # Apartment cornice, sill bands, and drainpipe.
+    draw_line(Vector2(657, 68), Vector2(873, 68), Color("#c1c7c4"), 3.0)
+    draw_line(Vector2(656, 151), Vector2(876, 151), Color("#5a6265"), 3.0)
+    draw_line(Vector2(868, 75), Vector2(868, 158), Color("#303b40"), 3.0)
+    for y in [82, 108, 134]:
+        draw_line(Vector2(859, y), Vector2(875, y), Color("#aeb7b5"), 1.5)
+    # Lower building gets a parapet cap and basement vent.
+    draw_line(Vector2(670, 404), Vector2(866, 404), Color("#c1ad91"), 4.0)
+    _draw_polygon([
+        Vector2(690, 454), Vector2(724, 454), Vector2(724, 470), Vector2(690, 470)
+    ], Color("#34444a"), Color("#252b2d"), 1.0)
+    for x in range(695, 723, 6):
+        draw_line(Vector2(x, 456), Vector2(x, 468), Color("#91a0a0"), 1.0)
+
+
+func _draw_fire_escape(origin: Vector2) -> void:
+    var x := origin.x
+    var y := origin.y
+    # Vertical ladder and two landings on the apartment facade.
+    draw_line(Vector2(x, y + 12), Vector2(x, y + 102), Color("#30383b"), 3.0)
+    draw_line(Vector2(x + 17, y + 12), Vector2(x + 17, y + 102), Color("#30383b"), 3.0)
+    for rung in range(0, 9):
+        var rung_y := y + 18 + rung * 10
+        draw_line(Vector2(x, rung_y), Vector2(x + 17, rung_y), Color("#7d8988"), 1.5)
+    for landing_y in [y + 45, y + 91]:
+        _draw_polygon([
+            Vector2(x - 18, landing_y), Vector2(x + 29, landing_y),
+            Vector2(x + 24, landing_y + 6), Vector2(x - 22, landing_y + 6)
+        ], Color("#687477"), Color("#252d30"), 1.2)
+        draw_line(Vector2(x - 17, landing_y - 13), Vector2(x + 27, landing_y - 13), Color("#9aa4a0"), 1.5)
+        for rail_x in range(int(x - 16), int(x + 28), 11):
+            draw_line(Vector2(rail_x, landing_y - 13), Vector2(rail_x, landing_y), Color("#596568"), 1.0)
+
+
+func _draw_court_fence() -> void:
+    # Chain-link fence is simplified into a readable modular metal frame.
+    draw_line(Vector2(670, 476), Vector2(925, 476), Color("#596765"), 3.0)
+    draw_line(Vector2(670, 516), Vector2(925, 516), Color("#596765"), 3.0)
+    for x in range(674, 926, 24):
+        draw_line(Vector2(x, 476), Vector2(x, 516), Color("#82908a"), 1.2)
+    for y in [486, 498, 510]:
+        draw_line(Vector2(670, y), Vector2(925, y), Color("#687773"), 0.8)
+    for x in [670, 798, 925]:
+        draw_line(Vector2(x, 470), Vector2(x, 521), Color("#3c4847"), 3.0)
+    # Gate opening and latch.
+    draw_line(Vector2(795, 479), Vector2(795, 514), Color("#a0aaa2"), 2.0)
+    draw_circle(Vector2(791, 495), 2.0, Color("#d0bd86"))
+
+
+func _draw_parking_details() -> void:
+    # Marked curbside parking bay and wheel stop.
+    draw_line(Vector2(28, 454), Vector2(245, 454), Color("#c6c4ad"), 2.0)
+    draw_line(Vector2(28, 454), Vector2(28, 491), Color("#c6c4ad"), 2.0)
+    draw_line(Vector2(245, 454), Vector2(245, 491), Color("#c6c4ad"), 2.0)
+    _draw_polygon([
+        Vector2(80, 485), Vector2(150, 485), Vector2(147, 491), Vector2(83, 491)
+    ], Color("#9a9a89"), Color("#4b5250"), 1.0)
+    draw_string(ThemeDB.fallback_font, Vector2(39, 447), "PARKING", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color("#d9d4bd"))
+
+
+func _draw_utility_poles_and_wires() -> void:
+    # Pole silhouettes and overhead service lines sit above the roofline.
+    _draw_polygon([
+        Vector2(604, 32), Vector2(611, 32), Vector2(613, 177), Vector2(606, 177)
+    ], Color("#594b3d"), Color("#292e2d"), 1.2)
+    draw_line(Vector2(582, 48), Vector2(635, 48), Color("#6f6251"), 3.0)
+    for x in [588, 601, 615, 629]:
+        draw_line(Vector2(x, 43), Vector2(x, 54), Color("#343b3b"), 1.5)
+    draw_line(Vector2(611, 48), Vector2(650, 24), Color("#252e32"), 1.2)
+    draw_line(Vector2(635, 48), Vector2(890, 28), Color("#252e32"), 1.0)
+    draw_line(Vector2(635, 54), Vector2(890, 43), Color("#3c4546"), 1.0)
+    # Small transformer canister and insulators.
+    _draw_polygon([
+        Vector2(615, 61), Vector2(630, 61), Vector2(632, 78), Vector2(613, 78)
+    ], Color("#69736d"), Color("#303938"), 1.0)
+    draw_line(Vector2(617, 65), Vector2(628, 65), Color("#aab0a2"), 1.0)
+
+
+
+func _draw_property_boundaries() -> void:
+    # Low masonry boundary and a hinged service gate along the rear lot.
+    draw_line(Vector2(28, 414), Vector2(252, 414), Color("#5a5148"), 5.0)
+    draw_line(Vector2(28, 414), Vector2(28, 440), Color("#857a68"), 4.0)
+    draw_line(Vector2(252, 414), Vector2(252, 440), Color("#857a68"), 4.0)
+    for x in range(34, 250, 28):
+        draw_line(Vector2(x, 410), Vector2(x, 419), Color("#b09b7d"), 2.0)
+    # Gate is visibly separate from the wall so the lot reads as accessible.
+    draw_line(Vector2(196, 414), Vector2(242, 435), Color("#596765"), 3.0)
+    draw_line(Vector2(242, 435), Vector2(242, 414), Color("#596765"), 3.0)
+    draw_line(Vector2(202, 416), Vector2(236, 431), Color("#9aa49d"), 1.0)
+    draw_circle(Vector2(199, 416), 2.0, Color("#d0bd86"))
+
+
+func _draw_alley_service_area() -> void:
+    # Recessed alley mouth, wall-mounted security light, and service door.
+    _draw_polygon([
+        Vector2(286, 354), Vector2(348, 354), Vector2(348, 365), Vector2(286, 365)
+    ], Color("#303a38"), Color("#1f2928"), 1.5)
+    _draw_polygon([
+        Vector2(296, 367), Vector2(338, 367), Vector2(338, 415), Vector2(296, 415)
+    ], Color("#34433d"), Color("#1f2928"), 1.5)
+    draw_line(Vector2(302, 373), Vector2(302, 409), Color("#778078"), 1.0)
+    draw_circle(Vector2(333, 392), 2.0, Color("#d0bd86"))
+    draw_line(Vector2(280, 360), Vector2(280, 349), Color("#353d3d"), 2.0)
+    _draw_polygon([
+        Vector2(274, 347), Vector2(286, 347), Vector2(288, 351), Vector2(273, 351)
+    ], Color("#d1b879"), Color("#343a39"), 1.0)
+    draw_circle(Vector2(280, 354), 9.0, Color(1.0, 0.78, 0.42, 0.10))
+
+
+func _draw_loading_zone() -> void:
+    # Market receiving area: painted boundary, pallet, and stacked cartons.
+    draw_line(Vector2(72, 181), Vector2(264, 181), Color("#d0c6a7"), 2.0)
+    draw_line(Vector2(72, 181), Vector2(72, 193), Color("#d0c6a7"), 2.0)
+    draw_line(Vector2(264, 181), Vector2(264, 193), Color("#d0c6a7"), 2.0)
+    _draw_polygon([
+        Vector2(212, 164), Vector2(253, 164), Vector2(257, 174), Vector2(216, 174)
+    ], Color("#795c42"), Color("#302c27"), 1.2)
+    draw_line(Vector2(219, 169), Vector2(251, 169), Color("#c09a67"), 1.0)
+    _draw_polygon([
+        Vector2(220, 146), Vector2(237, 146), Vector2(237, 164), Vector2(220, 164)
+    ], Color("#b18a58"), Color("#45372b"), 1.0)
+    _draw_polygon([
+        Vector2(239, 150), Vector2(255, 150), Vector2(255, 164), Vector2(239, 164)
+    ], Color("#92734d"), Color("#45372b"), 1.0)
+    draw_line(Vector2(228, 148), Vector2(228, 162), Color("#e0c18c"), 1.0)
+    draw_string(ThemeDB.fallback_font, Vector2(77, 177), "RECEIVING", HORIZONTAL_ALIGNMENT_LEFT, -1, 7, Color("#d8cfb4"))
+
+
+func _draw_building_rooftops() -> void:
+    # Roof access housings, vents, and water tank silhouette add a skyline layer.
+    _draw_polygon([
+        Vector2(102, 39), Vector2(144, 39), Vector2(148, 55), Vector2(98, 55)
+    ], Color("#66584b"), Color("#2e3331"), 1.5)
+    _draw_polygon([
+        Vector2(108, 31), Vector2(139, 31), Vector2(144, 39), Vector2(103, 39)
+    ], Color("#93816b"), Color("#3b3c36"), 1.0)
+    for x in [177, 194, 211]:
+        _draw_polygon([
+            Vector2(x, 43), Vector2(x + 10, 43), Vector2(x + 12, 53), Vector2(x - 2, 53)
+        ], Color("#59615d"), Color("#2c3332"), 1.0)
+        draw_line(Vector2(x + 2, 45), Vector2(x + 8, 45), Color("#a5aaa0"), 1.0)
+    # Elevated rooftop water tank on the apartment block.
+    draw_line(Vector2(715, 50), Vector2(715, 26), Color("#343c3e"), 2.0)
+    draw_line(Vector2(755, 50), Vector2(755, 26), Color("#343c3e"), 2.0)
+    _draw_polygon([
+        Vector2(710, 24), Vector2(760, 24), Vector2(756, 43), Vector2(714, 43)
+    ], Color("#765d4d"), Color("#2d3333"), 1.5)
+    draw_line(Vector2(715, 29), Vector2(756, 29), Color("#b18b68"), 1.0)
+    _draw_polygon([
+        Vector2(705, 22), Vector2(765, 22), Vector2(760, 26), Vector2(710, 26)
+    ], Color("#a17d5e"), Color("#343b39"), 1.0)
