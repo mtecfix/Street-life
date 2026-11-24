@@ -28,28 +28,42 @@ func _ready() -> void:
 func _draw() -> void:
     draw_rect(Rect2(Vector2.ZERO, Vector2(960, 540)), Color("#222b30"))
     if interior_kind == "shop":
-        draw_rect(Rect2(40, 95, 880, 355), Color("#53635f"))
-        draw_rect(Rect2(70, 120, 820, 285), Color("#718079"))
-        draw_rect(Rect2(110, 170, 740, 22), Color("#d4b77b"))
-        draw_rect(Rect2(110, 300, 740, 18), Color("#d4b77b"))
+        _draw_poly([Vector2(40, 112), Vector2(920, 112), Vector2(900, 450), Vector2(60, 450)], Color("#53635f"))
+        _draw_poly([Vector2(70, 132), Vector2(890, 132), Vector2(875, 405), Vector2(85, 405)], Color("#718079"))
+        # Two deep, chamfered shelf runs with visible front fascia.
+        _draw_poly([Vector2(105, 165), Vector2(855, 165), Vector2(850, 193), Vector2(110, 193)], Color("#d4b77b"))
+        _draw_poly([Vector2(110, 295), Vector2(850, 295), Vector2(845, 320), Vector2(115, 320)], Color("#d4b77b"))
         for i in range(8):
-            draw_rect(Rect2(125 + i * 88, 135, 45, 30), Color("#bd8b5c"))
-            draw_rect(Rect2(125 + i * 88, 260, 45, 30), Color("#7ca6a0"))
-        draw_rect(Rect2(390, 350, 180, 48), Color("#594a40"))
+            var shelf_x := 125.0 + float(i) * 88.0
+            _draw_poly([Vector2(shelf_x, 139), Vector2(shelf_x + 43, 139), Vector2(shelf_x + 40, 163), Vector2(shelf_x + 3, 163)], Color("#bd8b5c"))
+            _draw_poly([Vector2(shelf_x + 2, 265), Vector2(shelf_x + 45, 265), Vector2(shelf_x + 42, 292), Vector2(shelf_x + 4, 292)], Color("#7ca6a0"))
+            draw_line(Vector2(shelf_x + 8, 145), Vector2(shelf_x + 8, 157), Color("#e5c18e"), 2.0)
+            draw_line(Vector2(shelf_x + 25, 143), Vector2(shelf_x + 25, 157), Color("#e5c18e"), 2.0)
+        _draw_poly([Vector2(390, 354), Vector2(570, 354), Vector2(564, 400), Vector2(396, 400)], Color("#594a40"))
+        _draw_poly([Vector2(398, 350), Vector2(562, 350), Vector2(570, 357), Vector2(390, 357)], Color("#92735b"))
         draw_string(ThemeDB.fallback_font, Vector2(410, 380), "CHECKOUT", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color.WHITE)
         draw_string(ThemeDB.fallback_font, Vector2(420, 100), "MAYA'S MARKET", HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color.WHITE)
         draw_string(ThemeDB.fallback_font, Vector2(420, 490), "EXIT  [E]", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color("#f0d28e"))
     else:
-        draw_rect(Rect2(55, 90, 850, 365), Color("#675b52"))
-        draw_rect(Rect2(75, 110, 810, 325), Color("#938070"))
-        draw_rect(Rect2(125, 155, 260, 135), Color("#526c79"))
-        draw_rect(Rect2(145, 175, 220, 95), Color("#9db6bc"))
-        draw_rect(Rect2(600, 160, 190, 125), Color("#644b45"))
-        draw_rect(Rect2(615, 175, 160, 95), Color("#b38b77"))
-        draw_rect(Rect2(395, 185, 170, 100), Color("#4b5260"))
-        draw_rect(Rect2(410, 200, 140, 70), Color("#8c9da0"))
+        _draw_poly([Vector2(55, 105), Vector2(905, 105), Vector2(890, 455), Vector2(70, 455)], Color("#675b52"))
+        _draw_poly([Vector2(75, 125), Vector2(885, 125), Vector2(870, 435), Vector2(90, 435)], Color("#938070"))
+        _draw_poly([Vector2(125, 165), Vector2(385, 165), Vector2(378, 292), Vector2(132, 292)], Color("#526c79"))
+        _draw_poly([Vector2(145, 184), Vector2(365, 184), Vector2(360, 272), Vector2(150, 272)], Color("#9db6bc"))
+        draw_line(Vector2(255, 185), Vector2(252, 271), Color("#526c79"), 4.0)
+        _draw_poly([Vector2(600, 170), Vector2(790, 170), Vector2(782, 285), Vector2(608, 285)], Color("#644b45"))
+        _draw_poly([Vector2(615, 185), Vector2(775, 185), Vector2(770, 270), Vector2(620, 270)], Color("#b38b77"))
+        _draw_poly([Vector2(395, 195), Vector2(565, 195), Vector2(558, 290), Vector2(402, 290)], Color("#4b5260"))
+        _draw_poly([Vector2(410, 209), Vector2(550, 209), Vector2(545, 272), Vector2(415, 272)], Color("#8c9da0"))
+        _draw_poly([Vector2(388, 185), Vector2(572, 185), Vector2(565, 197), Vector2(395, 197)], Color("#b29a78"))
         draw_string(ThemeDB.fallback_font, Vector2(430, 175), "REST", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
         draw_string(ThemeDB.fallback_font, Vector2(420, 490), "EXIT  [E]", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color("#f0d28e"))
+
+func _draw_poly(points: PackedVector2Array, fill: Color, outline: Color = Color("#292e30"), width: float = 2.0) -> void:
+    draw_colored_polygon(points, fill)
+    var outline_points := points.duplicate()
+    outline_points.append(points[0])
+    draw_polyline(outline_points, outline, width, true)
+
 
 func _unhandled_input(event: InputEvent) -> void:
     if not event is InputEventKey or not event.pressed or event.echo:
