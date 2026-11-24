@@ -5,6 +5,9 @@ const STORE_DOOR := Vector2(170, 174)
 const APARTMENT_DOOR := Vector2(765, 174)
 const JOB_SITE := Vector2(300, 220)
 const RESIDENT_SHEET := preload("res://assets/sprites/residents.svg")
+# Additive CanvasLayer: observes existing systems without replacing the
+# neighborhood's established interactions, mission flow, or save behavior.
+const GAMEPLAY_HUD := preload("res://scenes/ui/GameHUD.tscn")
 const INVENTORY_PANEL_SCRIPT := preload("res://scripts/ui/inventory_panel.gd")
 
 var status_label: Label
@@ -27,6 +30,12 @@ func _ready() -> void:
     if player:
         player.global_position = GameState.previous_world_position
     _build_hud()
+    # Mount the new presentation layer after the legacy HUD is initialized.
+    # Existing labels remain available for dialogue and compatibility; this
+    # layer adds persistent player status, objective, district clock and map.
+    add_child(GAMEPLAY_HUD.instantiate())
+    # The inventory panel sets its own CanvasLayer.layer = 20, so it opens
+    # above the gameplay HUD (layer 1) regardless of mount order.
     inventory_panel = INVENTORY_PANEL_SCRIPT.new()
     add_child(inventory_panel)
     _sync_npc_schedules()
@@ -121,7 +130,10 @@ func _build_hud() -> void:
     dialogue_label = _make_label(Vector2(18, 485), 14, Color("#f3d59b"))
     var bag_button := Button.new()
     bag_button.text = "BAG  [I]"
-    bag_button.position = Vector2(820, 48)
+    # Sits just below the gameplay HUD's block map (x 742-942, y 92-246).
+    # The HUD is a CanvasLayer drawn above this Node2D, so the button's old
+    # spot at (820, 48) was hidden under the HUD's district/clock panel.
+    bag_button.position = Vector2(830, 256)
     bag_button.custom_minimum_size = Vector2(112, 34)
     bag_button.pressed.connect(_toggle_inventory)
     add_child(bag_button)
@@ -341,12 +353,11 @@ func _refresh_hud() -> void:
     inventory_label.text = "BAG %d/%d  |  I: INVENTORY  F: SNACK  H: MEDKIT  |  E: INTERACT" % [GameState.get_inventory_count(), GameState.INVENTORY_CAPACITY]
     reputation_label.text = "LOCALS: %s (%+d)  |  RIVALS: %s (%+d)" % [FactionManager.get_standing_label("locals"), int(GameState.reputation.get("locals", 0)), FactionManager.get_standing_label("rivals"), int(GameState.reputation.get("rivals", 0))]
     var active_hustle := HustleManager.get_active_hustle()
+    var active_event := EventManager.get_active_event()
     if not active_hustle.is_empty():
         hint_label.text = "COURIER RUN: %s — deliver to the gold marker with E." % str(active_hustle["title"])
-    else:
-        var active_event := EventManager.get_active_event()
-        if not active_event.is_empty():
-            hint_label.text = "EVENT: %s — %s" % [str(active_event["title"]), str(active_event["hours"])]
+    elif not active_event.is_empty():
+        hint_label.text = "EVENT: %s — %s" % [str(active_event["title"]), str(active_event["hours"])]
     elif GameState.mission_completed and not bool(GameState.world_flags.get("alley_encounter_completed", false)):
         hint_label.text = "JOB COMPLETE: Talk to Dre after 2 PM to investigate the alley."
     elif GameState.mission_completed:

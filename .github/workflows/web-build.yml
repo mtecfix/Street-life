@@ -51,6 +51,18 @@ jobs:
       - name: Run debug bridge snapshot tests
         run: godot --headless --path game --script res://tests/test_debug_bridge.gd
 
+      - name: Run neighborhood HUD hint tests
+        run: godot --headless --path game --script res://tests/test_neighborhood_hud.gd
+
+      - name: Run title screen scene tests
+        run: godot --headless --path game --script res://tests/test_title_screen.gd
+
+      - name: Run gameplay HUD tests
+        run: godot --headless --path game --script res://tests/test_game_hud.gd
+
+      - name: Run inventory change signal tests
+        run: godot --headless --path game --script res://tests/test_inventory_signals.gd
+
       - name: Prepare Web export directory
         run: mkdir -p game/build/web
 
