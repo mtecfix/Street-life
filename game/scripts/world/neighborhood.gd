@@ -47,21 +47,62 @@ func _draw() -> void:
         draw_rect(Rect2(380 + i * 18, 210, 9, 28), Color("#d7d0b3"))
         draw_rect(Rect2(380 + i * 18, 302, 9, 28), Color("#d7d0b3"))
 
-    draw_rect(Rect2(70, 55, 205, 105), Color("#6c594d"))
-    draw_rect(Rect2(78, 64, 189, 82), Color("#8b7660"))
-    draw_rect(Rect2(650, 55, 230, 105), Color("#5b646b"))
-    draw_rect(Rect2(660, 64, 210, 82), Color("#78838b"))
-    draw_rect(Rect2(665, 390, 205, 95), Color("#665b50"))
-    draw_rect(Rect2(680, 405, 175, 65), Color("#897967"))
-    draw_rect(Rect2(292, 360, 50, 145), Color("#4c5a4f"))
-    draw_rect(Rect2(290, 350, 54, 12), Color("#9b8a6d"))
-    draw_rect(Rect2(STORE_DOOR - Vector2(15, 8), Vector2(30, 16)), Color("#d9b66e"))
-    draw_rect(Rect2(APARTMENT_DOOR - Vector2(15, 8), Vector2(30, 16)), Color("#8ec2d1"))
+    _draw_block_building(Vector2(70, 55), Vector2(205, 105), Color("#8b7660"), Color("#51443e"), Color("#b28d69"), 3)
+    _draw_block_building(Vector2(650, 55), Vector2(230, 105), Color("#78838b"), Color("#424b52"), Color("#a9b4b8"), 4)
+    _draw_block_building(Vector2(665, 390), Vector2(205, 95), Color("#897967"), Color("#4c4540"), Color("#b09a7d"), 3)
+    _draw_polygon([Vector2(292, 360), Vector2(342, 360), Vector2(342, 505), Vector2(292, 505)], Color("#4c5a4f"))
+    _draw_polygon([Vector2(286, 350), Vector2(348, 350), Vector2(342, 363), Vector2(292, 363)], Color("#9b8a6d"))
+    _draw_polygon([STORE_DOOR + Vector2(-15, -8), STORE_DOOR + Vector2(15, -8), STORE_DOOR + Vector2(19, 8), STORE_DOOR + Vector2(-19, 8)], Color("#d9b66e"))
+    _draw_polygon([APARTMENT_DOOR + Vector2(-15, -8), APARTMENT_DOOR + Vector2(15, -8), APARTMENT_DOOR + Vector2(19, 8), APARTMENT_DOOR + Vector2(-19, 8)], Color("#8ec2d1"))
     draw_string(ThemeDB.fallback_font, Vector2(88, 92), "MAYA'S MARKET", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color.WHITE)
     draw_string(ThemeDB.fallback_font, Vector2(88, 120), "GROCERIES  /  SUPPLIES", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#f1d8aa"))
     draw_string(ThemeDB.fallback_font, Vector2(670, 92), "THE WALK-UPS", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, Color.WHITE)
     draw_string(ThemeDB.fallback_font, Vector2(670, 120), "APARTMENTS", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#d2e1e7"))
     draw_string(ThemeDB.fallback_font, Vector2(670, 430), "COMMUNITY COURT", HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color.WHITE)
+
+    # Traffic is simulated by the persistent autoload, not this scene.
+    var signal_state := WorldSimulation.get_traffic_signal_state()
+    draw_circle(Vector2(430, 185), 5.0, Color("#57c978") if signal_state == "horizontal" else Color("#bd4545"))
+    draw_circle(Vector2(520, 270), 5.0, Color("#57c978") if signal_state == "vertical" else Color("#bd4545"))
+    for vehicle in WorldSimulation.get_traffic_snapshot():
+        var vehicle_position: Vector2 = vehicle["position"]
+        var vehicle_length := float(vehicle["length"])
+        var vehicle_color: Color = vehicle["color"]
+        _draw_vehicle_block(vehicle_position, vehicle_length, vehicle_color, str(vehicle["axis"]))
+        if bool(vehicle["stopped"]):
+            draw_circle(vehicle_position + (Vector2(-vehicle_length * 0.5, 0) if str(vehicle["axis"]) == "horizontal" else Vector2(0, -vehicle_length * 0.5)), 2.0, Color("#e75d50"))
+
+    # Morning supplier delivery is a scheduled city agent, not an instant stock reset.
+    var delivery := WorldSimulation.get_business_delivery_snapshot("mayas_market")
+    if bool(delivery.get("active", false)):
+        var van_position: Vector2 = delivery["position"]
+        _draw_delivery_van(van_position)
+        draw_string(ThemeDB.fallback_font, van_position + Vector2(-17, 3), "SUPPLY", HORIZONTAL_ALIGNMENT_LEFT, -1, 7, Color("#263238"))
+        if bool(delivery.get("unloading", false)):
+            var worker_position: Vector2 = delivery["worker_position"]
+            draw_circle(worker_position, 5.0, Color("#e1b77d"))
+            draw_rect(Rect2(worker_position + Vector2(-4, 4), Vector2(8, 12)), Color("#d5a34e"))
+            draw_rect(Rect2(worker_position + Vector2(5, 2), Vector2(7, 8)), Color("#9b7650"))
+        draw_string(ThemeDB.fallback_font, Vector2(75, 245), "MORNING DELIVERY", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color("#f1d8aa"))
+
+    # Tasha works the market counter during the daytime shift.
+    var market_state := WorldSimulation.get_business_snapshot("mayas_market")
+    if bool(market_state.get("employee_on_shift", false)):
+        draw_texture_rect_region(RESIDENT_SHEET, Rect2(Vector2(170, 174) - Vector2(10, 15), Vector2(20, 30)), Rect2(4 * 32, 0, 32, 40))
+        draw_string(ThemeDB.fallback_font, Vector2(181, 163), "TASHA", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color("#f1d8aa"))
+
+    # Maya's Market foot traffic is part of the persistent city simulation.
+    for customer in WorldSimulation.get_business_visitors():
+        var customer_position: Vector2 = customer["position"]
+        var customer_frame := int(customer["sprite"])
+        draw_texture_rect_region(RESIDENT_SHEET, Rect2(customer_position - Vector2(9, 13), Vector2(18, 26)), Rect2(customer_frame * 32, 0, 32, 40))
+
+    # Ambient pedestrians are independent background agents. Their route
+    # positions come from persistent world time, not scene-local movement.
+    for pedestrian in WorldSimulation.get_ambient_pedestrians():
+        var pedestrian_position: Vector2 = pedestrian["position"]
+        var pedestrian_frame := int(pedestrian["sprite"])
+        draw_texture_rect_region(RESIDENT_SHEET, Rect2(pedestrian_position - Vector2(11, 16), Vector2(22, 30)), Rect2(pedestrian_frame * 32, 0, 32, 40))
 
     for npc in npcs:
         if not bool(npc["active"]):
@@ -88,6 +129,81 @@ func _draw() -> void:
     draw_circle(JOB_SITE, 20, Color("#d78b43"))
     draw_circle(JOB_SITE, 9, Color("#f3d59b"))
     draw_string(ThemeDB.fallback_font, JOB_SITE + Vector2(-48, 38), "CORNER JOB  [E]", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color.WHITE)
+
+func _draw_polygon(points: PackedVector2Array, fill: Color, outline: Color = Color("#252b2d"), width: float = 2.0) -> void:
+    draw_colored_polygon(points, fill)
+    var closed_points := points.duplicate()
+    closed_points.append(points[0])
+    draw_polyline(closed_points, outline, width, true)
+
+
+func _draw_block_building(origin: Vector2, size: Vector2, wall_color: Color, shadow_color: Color, trim_color: Color, window_columns: int) -> void:
+    var x := origin.x
+    var y := origin.y
+    var w := size.x
+    var h := size.y
+    _draw_polygon([Vector2(x + 9, y), Vector2(x + w - 12, y), Vector2(x + w, y + 13), Vector2(x, y + 13)], shadow_color)
+    _draw_polygon([Vector2(x, y + 13), Vector2(x + w, y + 13), Vector2(x + w - 5, y + h), Vector2(x + 5, y + h)], wall_color)
+    draw_line(Vector2(x + 5, y + h - 3), Vector2(x + w - 5, y + h - 3), trim_color, 4.0)
+    var gap := (w - 34.0) / float(maxi(1, window_columns))
+    for column in range(window_columns):
+        var wx := x + 17.0 + float(column) * gap
+        var window_points := PackedVector2Array([
+            Vector2(wx, y + 34), Vector2(wx + 24, y + 34),
+            Vector2(wx + 22, y + 65), Vector2(wx + 2, y + 65)
+        ])
+        _draw_polygon(window_points, Color("#344d59"), trim_color, 1.5)
+        draw_line(Vector2(wx + 12, y + 35), Vector2(wx + 11, y + 64), trim_color, 2.0)
+    _draw_polygon([
+        Vector2(x + 4, y + h - 20), Vector2(x + 30, y + h - 20),
+        Vector2(x + 29, y + h), Vector2(x + 5, y + h)
+    ], shadow_color, trim_color, 1.5)
+
+
+func _draw_vehicle_block(center: Vector2, length: float, body_color: Color, axis: String) -> void:
+    var half_length := length * 0.5
+    var points := PackedVector2Array()
+    var glass := PackedVector2Array()
+    if axis == "horizontal":
+        points = PackedVector2Array([
+            center + Vector2(-half_length, -5), center + Vector2(-half_length + 7, -8),
+            center + Vector2(half_length - 6, -8), center + Vector2(half_length, -4),
+            center + Vector2(half_length, 5), center + Vector2(-half_length, 5)
+        ])
+        glass = PackedVector2Array([
+            center + Vector2(-half_length + 8, -6), center + Vector2(half_length - 8, -6),
+            center + Vector2(half_length - 11, 2), center + Vector2(-half_length + 10, 2)
+        ])
+    else:
+        points = PackedVector2Array([
+            center + Vector2(-5, -half_length), center + Vector2(5, -half_length),
+            center + Vector2(8, -half_length + 7), center + Vector2(8, half_length - 6),
+            center + Vector2(5, half_length), center + Vector2(-5, half_length),
+            center + Vector2(-8, half_length - 6), center + Vector2(-8, -half_length + 7)
+        ])
+        glass = PackedVector2Array([
+            center + Vector2(-5, -half_length + 9), center + Vector2(5, -half_length + 9),
+            center + Vector2(5, half_length - 9), center + Vector2(-5, half_length - 9)
+        ])
+    _draw_polygon(points, body_color, Color("#202629"), 1.5)
+    draw_colored_polygon(glass, Color("#b9c9cc"))
+    draw_line(glass[0], glass[1], Color("#e0e7df"), 1.0)
+
+
+func _draw_delivery_van(center: Vector2) -> void:
+    _draw_polygon([
+        center + Vector2(-22, -7), center + Vector2(12, -10),
+        center + Vector2(22, -5), center + Vector2(22, 8),
+        center + Vector2(-22, 8)
+    ], Color("#b7b8ad"), Color("#252a2b"), 2.0)
+    _draw_polygon([
+        center + Vector2(7, -8), center + Vector2(17, -6),
+        center + Vector2(19, 5), center + Vector2(7, 5)
+    ], Color("#71818a"), Color("#39474c"), 1.0)
+    draw_circle(center + Vector2(-13, 9), 4.0, Color("#252a2b"))
+    draw_circle(center + Vector2(14, 9), 4.0, Color("#252a2b"))
+    draw_line(center + Vector2(-19, -4), center + Vector2(5, -6), Color("#e0dfd2"), 2.0)
+
 
 func _build_collision() -> void:
     _add_wall(Vector2(480, 8), Vector2(960, 16))
@@ -306,14 +422,16 @@ func _start_mission_encounter(encounter_id: String) -> void:
     SceneManager.change_to(combat_scene)
 
 func _sync_npc_schedules() -> void:
-    var hour := WorldClock.get_hour()
-    for npc in npcs:
-        var active := false
-        for window in npc["windows"]:
-            if hour >= int(window[0]) and hour < int(window[1]):
-                active = true
-                break
-        npc["active"] = active
+    for index in range(npcs.size()):
+        var npc: Dictionary = npcs[index]
+        var snapshot: Dictionary = WorldSimulation.get_resident_snapshot(str(npc["id"]))
+        if snapshot.is_empty():
+            npc["active"] = false
+            continue
+        npc["active"] = bool(snapshot["active"])
+        npc["position"] = snapshot["position"]
+        npc["activity"] = str(snapshot["activity"])
+        npcs[index] = npc
     queue_redraw()
 
 func _use_consumable(item_id: String) -> void:
