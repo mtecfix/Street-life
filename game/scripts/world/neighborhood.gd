@@ -5,6 +5,9 @@ const STORE_DOOR := Vector2(170, 174)
 const APARTMENT_DOOR := Vector2(765, 174)
 const JOB_SITE := Vector2(300, 220)
 const RESIDENT_SHEET := preload("res://assets/sprites/residents.svg")
+# Additive CanvasLayer: observes existing systems without replacing the
+# neighborhood's established interactions, mission flow, or save behavior.
+const GAMEPLAY_HUD := preload("res://scenes/ui/GameHUD.tscn")
 
 var status_label: Label
 var hint_label: Label
@@ -25,6 +28,10 @@ func _ready() -> void:
     if player:
         player.global_position = GameState.previous_world_position
     _build_hud()
+    # Mount the new presentation layer after the legacy HUD is initialized.
+    # Existing labels remain available for dialogue and compatibility; this
+    # layer adds persistent player status, objective, district clock and map.
+    add_child(GAMEPLAY_HUD.instantiate())
     _sync_npc_schedules()
     _refresh_hud()
     if GameState.player_health <= 0:
@@ -327,12 +334,11 @@ func _refresh_hud() -> void:
     inventory_label.text = "BAG %d/%d  |  I: INVENTORY  F: SNACK  H: MEDKIT  |  E: INTERACT" % [GameState.get_inventory_count(), GameState.INVENTORY_CAPACITY]
     reputation_label.text = "LOCALS: %s (%+d)  |  RIVALS: %s (%+d)" % [FactionManager.get_standing_label("locals"), int(GameState.reputation.get("locals", 0)), FactionManager.get_standing_label("rivals"), int(GameState.reputation.get("rivals", 0))]
     var active_hustle := HustleManager.get_active_hustle()
+    var active_event := EventManager.get_active_event()
     if not active_hustle.is_empty():
         hint_label.text = "COURIER RUN: %s — deliver to the gold marker with E." % str(active_hustle["title"])
-    else:
-        var active_event := EventManager.get_active_event()
-        if not active_event.is_empty():
-            hint_label.text = "EVENT: %s — %s" % [str(active_event["title"]), str(active_event["hours"])]
+    elif not active_event.is_empty():
+        hint_label.text = "EVENT: %s — %s" % [str(active_event["title"]), str(active_event["hours"])]
     elif GameState.mission_completed and not bool(GameState.world_flags.get("alley_encounter_completed", false)):
         hint_label.text = "JOB COMPLETE: Talk to Dre after 2 PM to investigate the alley."
     elif GameState.mission_completed:
