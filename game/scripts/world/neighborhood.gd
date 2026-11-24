@@ -334,12 +334,11 @@ func _refresh_hud() -> void:
     inventory_label.text = "BAG %d/%d  |  I: INVENTORY  F: SNACK  H: MEDKIT  |  E: INTERACT" % [GameState.get_inventory_count(), GameState.INVENTORY_CAPACITY]
     reputation_label.text = "LOCALS: %s (%+d)  |  RIVALS: %s (%+d)" % [FactionManager.get_standing_label("locals"), int(GameState.reputation.get("locals", 0)), FactionManager.get_standing_label("rivals"), int(GameState.reputation.get("rivals", 0))]
     var active_hustle := HustleManager.get_active_hustle()
+    var active_event := EventManager.get_active_event()
     if not active_hustle.is_empty():
         hint_label.text = "COURIER RUN: %s — deliver to the gold marker with E." % str(active_hustle["title"])
-    else:
-        var active_event := EventManager.get_active_event()
-        if not active_event.is_empty():
-            hint_label.text = "EVENT: %s — %s" % [str(active_event["title"]), str(active_event["hours"])]
+    elif not active_event.is_empty():
+        hint_label.text = "EVENT: %s — %s" % [str(active_event["title"]), str(active_event["hours"])]
     elif GameState.mission_completed and not bool(GameState.world_flags.get("alley_encounter_completed", false)):
         hint_label.text = "JOB COMPLETE: Talk to Dre after 2 PM to investigate the alley."
     elif GameState.mission_completed:
