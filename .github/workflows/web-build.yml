@@ -57,6 +57,9 @@ jobs:
       - name: Run title screen scene tests
         run: godot --headless --path game --script res://tests/test_title_screen.gd
 
+      - name: Run gameplay HUD tests
+        run: godot --headless --path game --script res://tests/test_game_hud.gd
+
       - name: Prepare Web export directory
         run: mkdir -p game/build/web
 
