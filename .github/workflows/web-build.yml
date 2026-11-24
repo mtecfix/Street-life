@@ -63,6 +63,21 @@ jobs:
       - name: Run inventory change signal tests
         run: godot --headless --path game --script res://tests/test_inventory_signals.gd
 
+      - name: Run inventory panel tests
+        run: godot --headless --path game --script res://tests/test_inventory_panel.gd
+
+      - name: Run shop checkout tests
+        run: godot --headless --path game --script res://tests/test_shop_checkout.gd
+
+      - name: Run combat environment prop tests
+        run: godot --headless --path game --script res://tests/test_combat_environment_props.gd
+
+      - name: Run combat hit reaction tests
+        run: godot --headless --path game --script res://tests/test_combat_hit_reactions.gd
+
+      - name: Run combat enemy archetype tests
+        run: godot --headless --path game --script res://tests/test_combat_enemy_styles.gd
+
       - name: Prepare Web export directory
         run: mkdir -p game/build/web
 
