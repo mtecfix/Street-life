@@ -80,6 +80,22 @@ func _draw() -> void:
         if bool(vehicle["stopped"]):
             draw_circle(vehicle_position + (Vector2(-vehicle_length * 0.5, 0) if str(vehicle["axis"]) == "horizontal" else Vector2(0, -vehicle_length * 0.5)), 2.0, Color("#e75d50"))
 
+    # Morning supplier delivery is a scheduled city agent, not an instant stock reset.
+    var delivery := WorldSimulation.get_business_delivery_snapshot("mayas_market")
+    if bool(delivery.get("active", false)):
+        var van_position: Vector2 = delivery["position"]
+        draw_rect(Rect2(van_position - Vector2(22, 10), Vector2(44, 20)), Color("#b7b8ad"))
+        draw_rect(Rect2(van_position - Vector2(13, 7), Vector2(17, 14)), Color("#71818a"))
+        draw_circle(van_position + Vector2(-13, 11), 4.0, Color("#252a2b"))
+        draw_circle(van_position + Vector2(14, 11), 4.0, Color("#252a2b"))
+        draw_string(ThemeDB.fallback_font, van_position + Vector2(-17, 3), "SUPPLY", HORIZONTAL_ALIGNMENT_LEFT, -1, 7, Color("#263238"))
+        if bool(delivery.get("unloading", false)):
+            var worker_position: Vector2 = delivery["worker_position"]
+            draw_circle(worker_position, 5.0, Color("#e1b77d"))
+            draw_rect(Rect2(worker_position + Vector2(-4, 4), Vector2(8, 12)), Color("#d5a34e"))
+            draw_rect(Rect2(worker_position + Vector2(5, 2), Vector2(7, 8)), Color("#9b7650"))
+        draw_string(ThemeDB.fallback_font, Vector2(75, 245), "MORNING DELIVERY", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color("#f1d8aa"))
+
     # Tasha works the market counter during the daytime shift.
     var market_state := WorldSimulation.get_business_snapshot("mayas_market")
     if bool(market_state.get("employee_on_shift", false)):
