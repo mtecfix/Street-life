@@ -5,6 +5,9 @@ const STORE_DOOR := Vector2(170, 174)
 const APARTMENT_DOOR := Vector2(765, 174)
 const JOB_SITE := Vector2(300, 220)
 const RESIDENT_SHEET := preload("res://assets/sprites/residents.svg")
+# Additive CanvasLayer: observes existing systems without replacing the
+# neighborhood's established interactions, mission flow, or save behavior.
+const GAMEPLAY_HUD := preload("res://scenes/ui/GameHUD.tscn")
 
 var status_label: Label
 var hint_label: Label
@@ -25,6 +28,10 @@ func _ready() -> void:
     if player:
         player.global_position = GameState.previous_world_position
     _build_hud()
+    # Mount the new presentation layer after the legacy HUD is initialized.
+    # Existing labels remain available for dialogue and compatibility; this
+    # layer adds persistent player status, objective, district clock and map.
+    add_child(GAMEPLAY_HUD.instantiate())
     _sync_npc_schedules()
     _refresh_hud()
     if GameState.player_health <= 0:
