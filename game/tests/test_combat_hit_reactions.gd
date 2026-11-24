@@ -10,8 +10,17 @@ func _initialize() -> void:
     call_deferred("_run")
 
 func _run() -> void:
-    GameState.current_encounter_id = "corner_brawler"
-    GameState.player_health = 100
+    # Autoloads are resolved from the tree at runtime. A script launched with
+    # --script is compiled before autoloads are registered, so referring to
+    # GameState by bare name fails with "Identifier not found".
+    var state: Variant = root.get_node_or_null("GameState")
+    if state == null:
+        push_error("Combat hit reaction test could not find the GameState autoload.")
+        quit(1)
+        return
+
+    state.current_encounter_id = "corner_brawler"
+    state.player_health = 100
     var scene: PackedScene = load("res://scenes/combat/CombatArena.tscn")
     var combat = scene.instantiate()
     root.add_child(combat)
@@ -19,7 +28,7 @@ func _run() -> void:
 
     combat.player.position = Vector2(400, 270)
     combat.enemy.position = Vector2(450, 270)
-    var initial_health := combat.enemy_health
+    var initial_health: float = combat.enemy_health
     combat._apply_enemy_hit(25, 135.0, 0.16)
 
     _check(combat.enemy_health == initial_health - 25.0, "A landed hit should reduce enemy health exactly once.")

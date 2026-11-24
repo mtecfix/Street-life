@@ -10,7 +10,15 @@ func _initialize() -> void:
     call_deferred("_run")
 
 func _make_combat(encounter_id: String):
-    GameState.current_encounter_id = encounter_id
+    # Autoloads are resolved from the tree at runtime. A script launched with
+    # --script is compiled before autoloads are registered, so referring to
+    # GameState by bare name fails with "Identifier not found".
+    var state: Variant = root.get_node_or_null("GameState")
+    if state == null:
+        push_error("Combat enemy style test could not find the GameState autoload.")
+        quit(1)
+        return null
+    state.current_encounter_id = encounter_id
     var packed: PackedScene = load("res://scenes/combat/CombatArena.tscn")
     var instance = packed.instantiate()
     root.add_child(instance)
@@ -43,7 +51,7 @@ func _run() -> void:
     runner.enemy_attack_sequence = 2
     runner._start_enemy_telegraph()
     _check(runner.enemy_feint_active, "Runner should periodically use a feint.")
-    var feint_health := runner.player_health
+    var feint_health: float = runner.player_health
     runner._resolve_enemy_feint()
     _check(is_equal_approx(runner.player_health, feint_health), "A feint must not deal damage.")
     _check(runner.enemy_recovery > 0.0, "A completed feint should leave a punishable recovery window.")
@@ -57,7 +65,7 @@ func _run() -> void:
     runner.telegraph_timer = 0.01
     runner.telegraph = Polygon2D.new()
     runner.add_child(runner.telegraph)
-    var before_rush := runner.enemy.position.x
+    var before_rush: float = runner.enemy.position.x
     runner._resolve_enemy_attack()
     _check(runner.enemy.position.x < before_rush, "Runner should lunge toward the player when its warning resolves.")
     _check(runner.enemy_attack_cooldown_timer > 0.0, "A resolved attack should start its attack cooldown.")
