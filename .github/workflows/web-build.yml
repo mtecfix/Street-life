@@ -60,6 +60,9 @@ jobs:
       - name: Run gameplay HUD tests
         run: godot --headless --path game --script res://tests/test_game_hud.gd
 
+      - name: Run inventory change signal tests
+        run: godot --headless --path game --script res://tests/test_inventory_signals.gd
+
       - name: Prepare Web export directory
         run: mkdir -p game/build/web
 
