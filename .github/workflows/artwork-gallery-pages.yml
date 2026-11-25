@@ -1,11 +1,18 @@
 name: Deploy artwork gallery to GitHub Pages
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'artwork-gallery/**'
-      - 'game/assets/sprites/generated/**'
-      - '.github/workflows/artwork-gallery-pages.yml'
+  # Automatic deploys are paused. This workflow and web-build.yml both publish
+  # to the same GitHub Pages site, so any push touching the paths below
+  # replaced the playable game at https://mtecfix.github.io/Street-life/ with
+  # the artwork gallery. Re-enable once the gallery is published under its
+  # own subpath (e.g. /gallery/) inside the web-build Pages artifact.
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - 'artwork-gallery/**'
+  #     - 'game/assets/sprites/generated/**'
+  #     - '.github/workflows/artwork-gallery-pages.yml'
+  # Manual runs are still possible from the Actions tab, but they will also
+  # replace the game on Pages until the subpath change above is made.
   workflow_dispatch:
 permissions:
   contents: read
