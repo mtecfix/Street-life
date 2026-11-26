@@ -133,7 +133,7 @@ func _test_legacy_save_migration(state: Variant, saves: Variant) -> void:
         _check(int(state.skill_levels.get("power", -1)) == 0 and int(state.skill_levels.get("endurance", -1)) == 0 and int(state.skill_levels.get("footwork", -1)) == 0, "v%d save should default all skill ranks to 0." % legacy_version)
         _check(state.player_cash == 123 and state.encounters_won == 3, "v%d save should keep existing progress." % legacy_version)
 
-    _write_save(JSON.stringify({"version": 6}))
+    _write_save(JSON.stringify({"version": 7}))
     _check(saves.load_game() == ERR_INVALID_DATA, "A save from a newer version should be rejected.")
 
 func _test_save_clamping(state: Variant, saves: Variant) -> void:
