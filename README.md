@@ -43,7 +43,8 @@ For browser deployment, serve the exported directory over HTTP(S); do not open `
 - TAB: switch fist fighting / firearms in combat
 - SPACE: melee combo; Q: heavy strike; C: guard; SHIFT: dodge
 - Z: aim; F: fire; R: reload (firearms) / body shot (melee); G: cycle firearm
-- Maya's Market: press 4 for the Compact SMG ($180) or 5 for the Street Carbine ($320); ownership and ammunition persist\n- K: open Combat Training in the neighborhood
+- Maya's Market: press 4 for the Compact SMG ($180) or 5 for the Street Carbine ($320); ownership and ammunition persist
+- K: open Combat Training in the neighborhood
 - Escape: return from arena to neighborhood
 
 ## Repository layout
