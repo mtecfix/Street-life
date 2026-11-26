@@ -89,6 +89,7 @@ func purchase_weapon(weapon_id: String) -> bool:
         return false
     player_cash -= price
     owned_weapons.append(weapon_id)
+    equipped_weapon_id = weapon_id
     weapon_ammo[weapon_id] = {"magazine": int(weapon["magazine"]), "reserve": int(weapon["reserve"])}
     EventBus.inventory_changed.emit("weapon:" + weapon_id, 1)
     SaveManager.save_game()
