@@ -221,3 +221,26 @@ References:
 - `FirearmCombatController` owns three distinct weapon profiles and the calculations for shot damage, cadence, and reload timing. Press **G** during a firearms encounter to cycle between the sidearm, SMG, and carbine. Each weapon retains its own loaded and reserve ammunition for the duration of that encounter.
 - Ranged shots are checked against the visible arena cover props. A blocked shot produces explicit line-of-sight feedback; players must reposition rather than shoot through obstacles.
 - Melee light/heavy inputs have a short late-recovery buffer. **Composure** now shortens post-hit aim recovery rather than adding unrelated damage.
+
+
+## 12. Persistent equipment and enemy archetypes — November 26, 2026
+
+The next gameplay slice replaces encounter-only firearm access with permanent ownership and makes the three current encounters behave differently.
+
+### Persistent firearm ownership
+- The sidearm is the starter weapon. The Compact SMG costs $180 and the Street Carbine costs $320 at Maya's Market.
+- Market inputs **4** and **5** purchase the SMG and carbine. A successful purchase automatically equips the new weapon.
+- Owned weapons and equipped weapon ID persist in save format **v7**. Existing v1–v6 saves migrate with the starter sidearm.
+- Each owned weapon retains its magazine and reserve ammunition across encounters and application saves. Firing and completed reloads update the persistent ammunition state.
+- **G** cycles only through firearms the player owns. Purchasing/equipping is separate from firearm skill-tree unlocks.
+
+### Enemy archetypes
+- **Pressure Fighter** (corner challenger): advances directly and keeps close pressure; average recovery.
+- **Counter Guard** (shopfront agitator): controls a preferred distance, has a longer readable windup, hits harder, and offers a longer punish window.
+- **Skirmisher** (alley runner): circles and repositions, attacks from a longer reach, deals lighter damage, and recovers faster.
+- Archetype movement and recovery rules live in `EnemyCombatController`; the arena retains health, telegraphs, and encounter lifecycle.
+
+### New validation coverage
+- `test_weapon_inventory.gd` covers purchase costs, duplicate/unknown rejection, equip rules, ammo persistence, and save/load.
+- `test_enemy_combat_controller.gd` covers the three distinct movement profiles and recovery windows.
+- The focused CI workflow now runs both tests. Runtime status remains for the developer to verify.
