@@ -40,7 +40,7 @@ func _run_tests() -> void:
     _check(state.has_combat_skill("melee", "combination_flow"), "Melee unlock did not persist.")
     _check(state.has_combat_skill("firearms", "quick_reload"), "Firearms unlock did not persist.")
 
-    var refunded := state.respec_combat_skills("melee")
+    var refunded: int = state.respec_combat_skills("melee")
     _check(refunded == 3, "Melee respec should refund the exact points spent in that tree.")
     _check(not state.has_combat_skill("melee", "street_fundamentals"), "Respec should clear the selected tree.")
     _check(state.has_combat_skill("firearms", "quick_reload"), "Respec must not clear the other discipline.")
