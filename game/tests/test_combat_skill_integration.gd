@@ -3,6 +3,7 @@ extends SceneTree
 # Run: godot --headless --path game --script res://tests/test_combat_skill_integration.gd
 
 var _failures: Array[String] = []
+const SAVE_PATH := "user://savegame.json"
 
 func _initialize() -> void:
     call_deferred("_run_tests")
@@ -13,6 +14,17 @@ func _run_tests() -> void:
         push_error("Combat integration test could not find GameState.")
         quit(1)
         return
+    var original_save := FileAccess.get_file_as_string(SAVE_PATH) if FileAccess.file_exists(SAVE_PATH) else ""
+    var original_owned: Array = state.owned_weapons.duplicate(true)
+    var original_equipped := state.equipped_weapon_id
+    var original_ammo: Dictionary = state.weapon_ammo.duplicate(true)
+    state.owned_weapons = ["sidearm", "smg", "carbine"]
+    state.equipped_weapon_id = "sidearm"
+    state.weapon_ammo = {
+        "sidearm": {"magazine": 12, "reserve": 48},
+        "smg": {"magazine": 24, "reserve": 96},
+        "carbine": {"magazine": 20, "reserve": 80}
+    }
     var packed := load("res://scenes/combat/CombatArena.tscn") as PackedScene
     if packed == null:
         push_error("Combat arena scene failed to load.")
@@ -72,6 +84,16 @@ func _run_tests() -> void:
     arena.queue_free()
 
     state.combat_skill_unlocks = {"melee": [], "firearms": []}
+    state.owned_weapons = original_owned
+    state.equipped_weapon_id = original_equipped
+    state.weapon_ammo = original_ammo
+    if original_save.is_empty():
+        if FileAccess.file_exists(SAVE_PATH):
+            DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+    else:
+        var save_file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+        if save_file != null:
+            save_file.store_string(original_save)
     if _failures.is_empty():
         print("PASS: firearms, timed reload, melee guard/counter, body shot, and training UI integration.")
         quit(0)
