@@ -24,7 +24,7 @@ const WEAPON_ORDER := ["sidearm", "smg", "carbine"]
 static func get_profile(weapon_id: String) -> Dictionary:
     return WEAPONS.get(weapon_id, WEAPONS["sidearm"]).duplicate(true)
 
-static func get_shot_damage(weapon_id: String, aiming: bool, moving: bool, unlocked: Array, last_shot_recent: bool, ammo_after_shot: int, aim_recovered: bool) -> float:
+static func get_shot_damage(weapon_id: String, aiming: bool, moving: bool, unlocked: Array, last_shot_recent: bool, ammo_after_shot: int) -> float:
     var profile := get_profile(weapon_id)
     var damage := float(profile["damage"])
     if aiming:
@@ -41,8 +41,6 @@ static func get_shot_damage(weapon_id: String, aiming: bool, moving: bool, unloc
         damage *= 1.15
     if "mobile_operator" in unlocked and last_shot_recent:
         damage *= 0.92
-    if aim_recovered and "composure" in unlocked:
-        damage *= 1.04
     return damage
 
 static func get_shot_cooldown(weapon_id: String, unlocked: Array) -> float:
