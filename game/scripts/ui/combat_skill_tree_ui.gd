@@ -133,8 +133,8 @@ func _refresh(_level: int = 0, _xp: int = 0, _points: int = 0) -> void:
     var unlocked: Array = GameState.combat_skill_unlocks.get(_active_style, [])
     for node_id in ids:
         var node: Dictionary = nodes[node_id]
-        var owned := node_id in unlocked
-        var available := CombatSkillTrees.can_purchase(_active_style, str(node_id), unlocked, GameState.skill_points)
+        var owned: bool = node_id in unlocked
+        var available: bool = CombatSkillTrees.can_purchase(_active_style, str(node_id), unlocked, GameState.skill_points)
         var state_text := "UNLOCKED" if owned else ("AVAILABLE" if available else "LOCKED")
         var button := Button.new()
         button.custom_minimum_size = Vector2(0, 54)
