@@ -40,7 +40,7 @@ For browser deployment, serve the exported directory over HTTP(S); do not open `
 
 - WASD / Arrow keys: move
 - E: interact with the marked encounter/exit
-- Escape: return from arena to neighborhood
+- TAB: switch fist fighting / firearms in combat\n- SPACE: melee combo; Q: heavy strike; C: guard; SHIFT: dodge\n- Z: aim; F: fire; R: reload (firearms) / body shot (melee); G: cycle firearm\n- K: open Combat Training in the neighborhood\n- Escape: return from arena to neighborhood
 
 ## Repository layout
 
