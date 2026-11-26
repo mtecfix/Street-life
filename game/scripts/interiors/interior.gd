@@ -103,8 +103,8 @@ func _exit_interior() -> void:
 
 func _refresh_text() -> void:
     if interior_kind == "shop":
-        var smg_state := "OWNED" if "smg" in GameState.owned_weapons else "$180"
-        var carbine_state := "OWNED" if "carbine" in GameState.owned_weapons else "$320"
+        var smg_state := "EQUIPPED" if GameState.equipped_weapon_id == "smg" else ("OWNED" if "smg" in GameState.owned_weapons else "$180")
+        var carbine_state := "EQUIPPED" if GameState.equipped_weapon_id == "carbine" else ("OWNED" if "carbine" in GameState.owned_weapons else "$320")
         detail_label.text = "1 SNACK $5  |  2 FIRST-AID $18  |  3 SODA $8\n4 COMPACT SMG %s  |  5 STREET CARBINE %s  |  ESC: EXIT" % [smg_state, carbine_state]
     else:
         detail_label.text = "Move to the bed and press E to rest for eight hours. Health is fully restored. Move to the bottom door and press E to leave."
