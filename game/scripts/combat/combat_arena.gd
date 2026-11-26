@@ -175,19 +175,19 @@ func _configure_encounter() -> void:
             enemy_archetype_id = "counter_guard"
             enemy_name = "Shopfront agitator"
             enemy_health = 82.0
-            enemy_speed = 118.0
-            enemy_attack_range = 70.0
-            enemy_damage = 14.0
-            enemy_windup = 0.64
+            enemy_speed = 82.0
+            enemy_attack_range = 128.0
+            enemy_damage = 20.0
+            enemy_windup = 1.02
             enemy_color = Color("#c58c4e")
             encounter_reward = 40
         "alley_ambush":
             enemy_archetype_id = "skirmisher"
             enemy_name = "Alley runner"
             enemy_health = 125.0
-            enemy_speed = 138.0
-            enemy_attack_range = 82.0
-            enemy_damage = 22.0
+            enemy_speed = 128.0
+            enemy_attack_range = 142.0
+            enemy_damage = 14.0
             enemy_windup = 0.58
             enemy_color = Color("#9e6bb0")
             encounter_reward = 35
