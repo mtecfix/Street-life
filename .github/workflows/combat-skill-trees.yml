@@ -40,5 +40,7 @@ jobs:
         run: godot --headless --path game --script res://tests/test_weapon_inventory.gd
       - name: Test enemy combat archetypes and factions
         run: godot --headless --path game --script res://tests/test_enemy_combat_controller.gd
+      - name: Test enemy faction profiles
+        run: godot --headless --path game --script res://tests/test_enemy_factions.gd
       - name: Test combat scenes
         run: godot --headless --path game --script res://tests/test_combat_scenes.gd
