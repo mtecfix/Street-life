@@ -29,6 +29,7 @@ var telegraph_timer := -1.0
 var dodge_timer := 0.0
 var invulnerability_timer := 0.0
 var dodge_direction := Vector2.ZERO
+var facing_direction := Vector2.RIGHT
 var finished := false
 var combat_style := "melee"
 var ammo_in_magazine := 8
@@ -223,6 +224,8 @@ func _process(delta: float) -> void:
         player.position += dodge_direction * 510.0 * delta
     else:
         var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down")
+        if absf(direction.x) > 0.1:
+            facing_direction = Vector2.RIGHT if direction.x > 0.0 else Vector2.LEFT
         var move_speed := GameState.get_player_speed()
         if combat_style == "firearms" and aiming and GameState.has_combat_skill("firearms", "precision_specialist"):
             move_speed *= 0.90
@@ -373,7 +376,8 @@ func _resolve_enemy_attack() -> void:
     telegraph_timer = -1.0
     telegraph.visible = false
     enemy_recovery = 1.05
-    if guard_timer > 0.0 and combat_style == "melee":
+    var enemy_direction := (enemy.position - player.position).normalized()
+    if guard_timer > 0.0 and combat_style == "melee" and facing_direction.dot(enemy_direction) > 0.35:
         guard_timer = 0.0
         if GameState.has_combat_skill("melee", "counter_window"):
             var counter_damage := 20.0 * (1.30 if GameState.has_combat_skill("melee", "counter_specialist") else 1.0)
