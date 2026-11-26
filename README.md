@@ -16,7 +16,7 @@ An original 2D urban action-adventure game built with Godot 4.x and targeted at 
 The first implementation sprint provides:
 - A Godot project with a main scene and explorable test block.
 - Keyboard movement and collision.
-- A separate combat arena scene with a basic enemy encounter.
+- Separate combat arenas with fist-fighting and firearm systems, persistent weapon ownership, and distinct pressure-fighter, counter-guard, and skirmisher enemy behaviors.
 - Scene transitions through an autoloaded scene manager.
 - Local save/load scaffolding.
 - Global game state, world clock, and event bus.
@@ -43,7 +43,7 @@ For browser deployment, serve the exported directory over HTTP(S); do not open `
 - TAB: switch fist fighting / firearms in combat
 - SPACE: melee combo; Q: heavy strike; C: guard; SHIFT: dodge
 - Z: aim; F: fire; R: reload (firearms) / body shot (melee); G: cycle firearm
-- K: open Combat Training in the neighborhood
+- Maya's Market: press 4 for the Compact SMG ($180) or 5 for the Street Carbine ($320); ownership and ammunition persist\n- K: open Combat Training in the neighborhood
 - Escape: return from arena to neighborhood
 
 ## Repository layout
