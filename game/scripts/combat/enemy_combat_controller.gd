@@ -7,24 +7,30 @@ const ARCHETYPES := {
         "display_name": "Pressure Fighter",
         "preferred_distance": 54.0,
         "movement": "advance",
+        "recovery": 0.92,
         "strafe_strength": 0.0
     },
     "counter_guard": {
         "display_name": "Counter Guard",
         "preferred_distance": 112.0,
         "movement": "hold",
+        "recovery": 1.35,
         "strafe_strength": 0.0
     },
     "skirmisher": {
         "display_name": "Skirmisher",
         "preferred_distance": 118.0,
         "movement": "orbit",
+        "recovery": 0.72,
         "strafe_strength": 0.72
     }
 }
 
 static func get_profile(archetype_id: String) -> Dictionary:
     return ARCHETYPES.get(archetype_id, ARCHETYPES["pressure_brawler"]).duplicate(true)
+
+static func get_recovery_duration(archetype_id: String) -> float:
+    return float(get_profile(archetype_id)["recovery"])
 
 static func get_movement_direction(archetype_id: String, player_position: Vector2, enemy_position: Vector2, elapsed_seconds: float) -> Vector2:
     var profile := get_profile(archetype_id)
