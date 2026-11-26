@@ -39,6 +39,9 @@ var guard_timer := 0.0
 var flank_followup_ready := false
 var last_shot_timer := 0.0
 var aim_recovery_timer := 0.0
+var aiming := false
+var aim_transition_timer := 0.0
+var aim_line: Line2D
 
 var player: Polygon2D
 var enemy: Polygon2D
@@ -130,6 +133,13 @@ func _ready() -> void:
     telegraph.visible = false
     add_child(telegraph)
 
+    aim_line = Line2D.new()
+    aim_line.points = PackedVector2Array([Vector2.ZERO, Vector2(125, 0)])
+    aim_line.width = 2.0
+    aim_line.default_color = Color("#e6b56d", 0.72)
+    aim_line.visible = false
+    add_child(aim_line)
+
     stats = Label.new()
     stats.position = Vector2(24, 18)
     stats.add_theme_font_size_override("font_size", 18)
@@ -141,7 +151,7 @@ func _ready() -> void:
 
     var heading := Label.new()
     heading.position = Vector2(24, 166)
-    heading.text = "%s  |  TAB: STYLE   F: FIRE   R: RELOAD / BODY SHOT   SPACE: COMBO   Q: HEAVY   C: GUARD   SHIFT: DODGE   ESC: RETREAT" % _environment_label()
+    heading.text = "%s  |  TAB: STYLE   A: AIM   F: FIRE   R: RELOAD / BODY SHOT   SPACE: COMBO   Q: HEAVY   C: GUARD   SHIFT: DODGE   ESC: RETREAT" % _environment_label()
     heading.add_theme_color_override("font_color", Color("#d6dce7"))
     add_child(heading)
 
@@ -192,6 +202,7 @@ func _process(delta: float) -> void:
     guard_timer = maxf(0.0, guard_timer - delta)
     last_shot_timer = maxf(0.0, last_shot_timer - delta)
     aim_recovery_timer = maxf(0.0, aim_recovery_timer - delta)
+    aim_transition_timer = maxf(0.0, aim_transition_timer - delta)
     if reload_timer > 0.0:
         reload_timer -= delta
         if reload_timer <= 0.0:
@@ -224,6 +235,10 @@ func _process(delta: float) -> void:
     player.position.y = clampf(player.position.y, 205.0, 445.0)
 
     var distance := enemy.position.distance_to(player.position)
+    if is_instance_valid(aim_line):
+        aim_line.visible = aiming and combat_style == "firearms"
+        aim_line.position = player.position
+        aim_line.rotation = (enemy.position - player.position).angle()
     if distance > 61.0:
         enemy.position = enemy.position.move_toward(player.position, enemy_speed * delta)
 
@@ -250,6 +265,8 @@ func _unhandled_input(event: InputEvent) -> void:
     elif event is InputEventKey and event.pressed and not event.echo:
         if event.keycode == KEY_TAB:
             _toggle_combat_style()
+        elif event.keycode == KEY_A:
+            _toggle_aim()
         elif event.keycode == KEY_F:
             if combat_style == "firearms":
                 _firearm_attack()
@@ -460,7 +477,7 @@ func _set_status(message: String) -> void:
 func _refresh() -> void:
     if stats:
         if combat_style == "firearms":
-            stats.text = "CASH: $%d   FIREARMS   AMMO: %d / %d%s" % [GameState.player_cash, ammo_in_magazine, reserve_ammo, "   RELOADING" if reload_timer > 0.0 else ""]
+            stats.text = "CASH: $%d   FIREARMS   %s   AMMO: %d / %d%s" % [GameState.player_cash, "AIM" if aiming else "HIP", ammo_in_magazine, reserve_ammo, "   RELOADING" if reload_timer > 0.0 else ""]
         else:
             stats.text = "CASH: $%d   FIST FIGHTING   SP: %d" % [GameState.player_cash, GameState.skill_points]
     if player_hp_bar:
@@ -475,6 +492,8 @@ func _toggle_combat_style() -> void:
     if finished:
         return
     combat_style = "firearms" if combat_style == "melee" else "melee"
+    if combat_style == "melee":
+        aiming = false
     attack_cooldown = 0.05 if GameState.has_combat_skill("firearms", "reposition") else (0.18 if GameState.has_combat_skill("firearms", "snap_aim") else 0.28)
     reload_timer = 0.0
     _set_status("Combat style: %s. %s" % ["FIREARMS" if combat_style == "firearms" else "FIST FIGHTING", "F fires, R reloads." if combat_style == "firearms" else "SPACE combo, Q heavy, C guard."])
@@ -492,18 +511,23 @@ func _firearm_attack() -> void:
         _set_status("Target out of range. Close the distance.")
         return
     ammo_in_magazine -= 1
-    var damage := 18.0
+    var damage := 16.0
     var moving := Input.get_vector("move_left", "move_right", "move_up", "move_down") != Vector2.ZERO
+    var aim_ready := aiming and aim_transition_timer <= 0.0
+    if aim_ready:
+        damage *= 1.20
     if moving:
         damage *= 0.86 if not GameState.has_combat_skill("firearms", "move_and_aim") else 0.96
-    elif GameState.has_combat_skill("firearms", "steady_hands"):
+    elif aim_ready and GameState.has_combat_skill("firearms", "steady_hands"):
         damage *= 1.10
     if GameState.has_combat_skill("firearms", "controlled_burst") and last_shot_timer > 0.0:
         damage *= 1.12
     if ammo_in_magazine <= 2 and GameState.has_combat_skill("firearms", "last_round_focus"):
         damage *= 1.08
-    if GameState.has_combat_skill("firearms", "precision_specialist"):
+    if aim_ready and GameState.has_combat_skill("firearms", "precision_specialist"):
         damage *= 1.15
+    if GameState.has_combat_skill("firearms", "mobile_operator") and last_shot_timer > 0.0:
+        damage *= 0.92
     if GameState.has_combat_skill("firearms", "mobile_operator"):
         attack_cooldown = 0.36
     elif GameState.has_combat_skill("firearms", "snap_aim"):
@@ -575,3 +599,12 @@ func _guard() -> void:
     stamina -= 8.0
     guard_timer = 0.52
     _set_status("GUARD UP — hold your ground for the incoming strike.")
+
+
+func _toggle_aim() -> void:
+    if finished or combat_style != "firearms":
+        return
+    aiming = not aiming
+    aim_transition_timer = 0.12 if GameState.has_combat_skill("firearms", "snap_aim") else 0.22
+    _set_status("AIMING — improved shot control." if aiming else "HIP FIRE — move freely.")
+    _refresh()
