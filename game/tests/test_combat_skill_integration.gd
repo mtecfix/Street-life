@@ -44,6 +44,7 @@ func _run_tests() -> void:
     arena._resolve_enemy_attack()
     _check(arena.enemy_health < health_before_counter, "A timed frontal guard with Counter Window should counterattack.")
 
+    arena.attack_cooldown = 0.0
     var health_before_body_shot := arena.enemy_health
     arena._body_shot()
     _check(arena.enemy_health < health_before_body_shot, "Unlocked Body Shot should apply its special attack.")
