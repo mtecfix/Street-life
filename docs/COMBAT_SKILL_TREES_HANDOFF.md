@@ -80,3 +80,12 @@ Please treat this as a feature branch requiring normal code review and runtime v
 ### Combat presentation update
 
 Successful player hits now show floating damage labels and brief target flashes. Incoming damage displays a red health-loss callout and player flash. Telegraph rings pulse and are color-coded by enemy archetype. These are procedural placeholder effects; final sprite animation, sound design, recoil, and hit-stop remain follow-up work.
+
+
+## Rival crew foundation
+
+- Encounters are assigned a persistent design identity: Corner Set (corner challenger), Market Crew (shopfront agitator), or Alley Runners (alley ambush).
+- Crew identity is shown alongside the opponent name and in the encounter introduction.
+- Factions modify enemy speed, damage, attack windup, and recovery. Market Crew opponents hit harder but telegraph more slowly; Alley Runners are faster and lighter-hitting with quicker recovery; Corner Set is the baseline.
+- Faction modifiers are data-driven in `EnemyCombatController`, independently testable, and designed to extend to multi-member crew encounters.
+- This slice does not yet spawn multiple combatants. Group spawning, target selection, and coordinated multi-enemy attack scheduling remain the next arena architecture step.
