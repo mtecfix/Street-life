@@ -30,5 +30,7 @@ jobs:
         run: godot --headless --path game --script res://tests/test_combat_skill_trees.gd
       - name: Test combat rules
         run: godot --headless --path game --script res://tests/test_combat_rules.gd
+      - name: Test combat skill integration
+        run: godot --headless --path game --script res://tests/test_combat_skill_integration.gd
       - name: Test combat scenes
         run: godot --headless --path game --script res://tests/test_combat_scenes.gd
