@@ -126,7 +126,7 @@ func _refresh(_level: int = 0, _xp: int = 0, _points: int = 0) -> void:
     var tree: Dictionary = CombatSkillTrees.get_tree(_active_style)
     _tree_title.text = "%s  —  %s" % [str(tree.get("display_name", "Combat")), str(tree.get("description", ""))]
     for child in _node_list.get_children():
-        child.queue_free()
+        child.free()
     var nodes: Dictionary = tree.get("nodes", {})
     var ids: Array = nodes.keys()
     ids.sort_custom(func(a, b): return int(nodes[a].get("tier", 0)) < int(nodes[b].get("tier", 0)))
