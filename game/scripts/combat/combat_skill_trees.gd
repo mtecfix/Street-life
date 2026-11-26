@@ -25,19 +25,19 @@ const TREES := {
         "display_name": "Firearms",
         "description": "Handling, readiness, mobility, and awareness.",
         "nodes": {
-            "steady_hands": {"name": "Steady Hands", "tier": 0, "cost": 1, "requires": [], "description": "Reduces aim drift while stationary.", "effects": {"stationary_aim_stability": 1.10}},
+            "steady_hands": {"name": "Steady Hands", "tier": 0, "cost": 1, "requires": [], "description": "Increases aimed-shot damage while stationary.", "effects": {"stationary_aim_stability": 1.10}},
             "fast_hands": {"name": "Fast Hands", "tier": 0, "cost": 1, "requires": [], "description": "Modestly shortens reload time.", "effects": {"reload_duration_multiplier": 0.92}},
             "combat_awareness": {"name": "Combat Awareness", "tier": 0, "cost": 1, "requires": [], "description": "Improves enemy threat indicators and flank feedback.", "effects": {"threat_feedback": true}},
             "controlled_burst": {"name": "Controlled Burst", "tier": 1, "cost": 2, "requires": ["steady_hands"], "description": "Improves consistency during short firing bursts.", "effects": {"burst_stability": 1.12}},
-            "snap_aim": {"name": "Snap Aim", "tier": 1, "cost": 2, "requires": ["steady_hands"], "description": "Speeds aim entry with a small moving-accuracy trade-off.", "effects": {"aim_transition_multiplier": 0.88}},
+            "snap_aim": {"name": "Snap Aim", "tier": 1, "cost": 2, "requires": ["steady_hands"], "description": "Shortens the transition into aim mode.", "effects": {"aim_transition_multiplier": 0.88}},
             "composure": {"name": "Composure", "tier": 2, "cost": 3, "requires": ["snap_aim", "combat_awareness"], "description": "Restores aim stability sooner after taking a hit.", "effects": {"aim_recovery_multiplier": 1.15}},
             "quick_reload": {"name": "Quick Reload", "tier": 1, "cost": 2, "requires": ["fast_hands"], "description": "Further shortens reload duration.", "effects": {"reload_duration_multiplier": 0.84}},
             "ammo_discipline": {"name": "Ammo Discipline", "tier": 1, "cost": 2, "requires": ["fast_hands"], "description": "Speeds up a tactical reload when rounds remain in the magazine.", "effects": {"tactical_reload_speed_multiplier": 0.88}},
-            "last_round_focus": {"name": "Last Round Focus", "tier": 2, "cost": 3, "requires": ["quick_reload", "ammo_discipline"], "description": "Improves low-ammo feedback and handling near magazine depletion.", "effects": {"low_ammo_handling": 1.08}},
+            "last_round_focus": {"name": "Last Round Focus", "tier": 2, "cost": 3, "requires": ["quick_reload", "ammo_discipline"], "description": "Adds a modest damage bonus when only a few rounds remain.", "effects": {"low_ammo_handling": 1.08}},
             "move_and_aim": {"name": "Move and Aim", "tier": 1, "cost": 2, "requires": ["combat_awareness"], "description": "Reduces the movement penalty while aiming.", "effects": {"aim_move_penalty_multiplier": 0.85}},
             "cover_awareness": {"name": "Cover Awareness", "tier": 1, "cost": 2, "requires": ["combat_awareness"], "description": "Extends effective target acquisition range and range feedback.", "effects": {"cover_feedback": true}},
-            "reposition": {"name": "Reposition", "tier": 2, "cost": 3, "requires": ["move_and_aim", "cover_awareness"], "description": "Improves recovery when leaving aim mode.", "effects": {"aim_exit_recovery_multiplier": 1.15}},
-            "precision_specialist": {"name": "Precision Specialist", "tier": 3, "cost": 4, "requires": ["controlled_burst", "composure"], "description": "Improves deliberate shot stability but slows movement while aiming.", "effects": {"precision_mastery": true}},
+            "reposition": {"name": "Reposition", "tier": 2, "cost": 3, "requires": ["move_and_aim", "cover_awareness"], "description": "Improves recovery when switching between combat styles.", "effects": {"aim_exit_recovery_multiplier": 1.15}},
+            "precision_specialist": {"name": "Precision Specialist", "tier": 3, "cost": 4, "requires": ["controlled_burst", "composure"], "description": "Improves aimed-shot damage but slows movement while aiming.", "effects": {"precision_mastery": true}},
             "mobile_operator": {"name": "Mobile Operator", "tier": 3, "cost": 4, "requires": ["move_and_aim", "reposition"], "description": "Improves movement and aim transitions but reduces sustained-fire stability.", "effects": {"mobility_mastery": true}}
         }
     }
