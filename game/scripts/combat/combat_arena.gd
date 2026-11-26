@@ -424,7 +424,7 @@ func _attack() -> void:
     combo_window_timer = 0.85 * (1.15 if GameState.has_combat_skill("melee", "combination_flow") else 1.0)
     _apply_enemy_damage(float(damage), "COMBO")
     if enemy_health <= 0.0:
-        _win_encounter()
+        _handle_enemy_defeated()
     else:
         var combo_label := "3-HIT COMBO!" if combo_step == 0 else "COMBO %d/3" % combo_step
         _set_status("%s — %d damage. Press Q for a heavy strike." % [combo_label, damage])
@@ -450,7 +450,7 @@ func _heavy_attack() -> void:
         enemy_recovery = 0.85
 
     if enemy_health <= 0.0:
-        _win_encounter()
+        _handle_enemy_defeated()
     elif interrupted:
         _set_status("HEAVY HIT — %d damage. You interrupted the incoming strike!" % damage)
     else:
@@ -496,7 +496,7 @@ func _resolve_enemy_attack() -> void:
             _apply_enemy_damage(counter_damage, "COUNTER")
             _set_status("PERFECT BLOCK — counter for %d damage!" % roundi(counter_damage))
             if enemy_health <= 0.0:
-                _win_encounter()
+                _handle_enemy_defeated()
         else:
             _set_status("BLOCKED! You absorbed the incoming strike.")
     elif player.position.distance_to(enemy.position) <= enemy_attack_range + 20.0 and invulnerability_timer <= 0.0:
@@ -650,7 +650,7 @@ func _firearm_attack() -> void:
     last_shot_timer = 0.72
     _apply_enemy_damage(damage, "SHOT")
     if enemy_health <= 0.0:
-        _win_encounter()
+        _handle_enemy_defeated()
     else:
         _set_status("%s — HIT CONFIRMED: %d damage. %d rounds remain." % [str(profile["name"]), roundi(damage), ammo_in_magazine])
     _refresh()
@@ -785,7 +785,7 @@ func _body_shot() -> void:
         telegraph.visible = false
         enemy_recovery = 1.0
     if enemy_health <= 0.0:
-        _win_encounter()
+        _handle_enemy_defeated()
     else:
         _set_status("BODY SHOT — 34 damage%s." % ("; attack interrupted" if interrupted else ""))
 
