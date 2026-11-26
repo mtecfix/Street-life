@@ -20,7 +20,7 @@ func _run_tests() -> void:
     arena.player.position = Vector2(250, 270)
     arena.enemy.position = Vector2(360, 270)
     arena.combat_style = "firearms"
-    var starting_health := arena.enemy_health
+    var starting_health: float = arena.enemy_health
     arena._firearm_attack()
     _check(arena.ammo_in_magazine == 7, "Firing should consume one magazine round.")
     _check(arena.enemy_health < starting_health, "An in-range firearm shot should damage the opponent.")
@@ -40,12 +40,12 @@ func _run_tests() -> void:
     arena.facing_direction = Vector2.RIGHT
     arena.guard_timer = 0.5
     arena.telegraph_timer = 0.1
-    var health_before_counter := arena.enemy_health
+    var health_before_counter: float = arena.enemy_health
     arena._resolve_enemy_attack()
     _check(arena.enemy_health < health_before_counter, "A timed frontal guard with Counter Window should counterattack.")
 
     arena.attack_cooldown = 0.0
-    var health_before_body_shot := arena.enemy_health
+    var health_before_body_shot: float = arena.enemy_health
     arena._body_shot()
     _check(arena.enemy_health < health_before_body_shot, "Unlocked Body Shot should apply its special attack.")
 
