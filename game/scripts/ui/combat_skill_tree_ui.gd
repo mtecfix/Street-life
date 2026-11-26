@@ -142,7 +142,7 @@ func _refresh(_level: int = 0, _xp: int = 0, _points: int = 0) -> void:
         button.text = "%s  ·  %s  ·  %d SP\n%s" % [str(node.get("name", node_id)), state_text, int(node.get("cost", 1)), str(node.get("description", ""))]
         button.alignment = HORIZONTAL_ALIGNMENT_LEFT
         button.disabled = owned or not available
-        button.tooltip_text = "Prerequisites: %s" % ", ".join(node.get("requires", []))
+        button.tooltip_text = "Prerequisites: %s" % str(node.get("requires", []))
         button.pressed.connect(_purchase.bind(str(node_id)))
         _node_list.add_child(button)
 
