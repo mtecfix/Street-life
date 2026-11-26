@@ -63,7 +63,7 @@ func _run_tests() -> void:
     ui.queue_free()
     arena.queue_free()
 
-    GameState.combat_skill_unlocks = {"melee": [], "firearms": []}
+    state.combat_skill_unlocks = {"melee": [], "firearms": []}
     if _failures.is_empty():
         print("PASS: firearms, timed reload, melee guard/counter, body shot, and training UI integration.")
         quit(0)
