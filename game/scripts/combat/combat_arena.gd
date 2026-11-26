@@ -15,6 +15,7 @@ var enemy_attack_range := 76.0
 var enemy_damage := 18.0
 var enemy_windup := 0.78
 var enemy_name := "Corner challenger"
+var enemy_archetype_id := "pressure_brawler"
 var enemy_color := Color("#d66a55")
 var enemy_health := 100.0
 var encounter_reward := 50
@@ -37,8 +38,6 @@ var combat_style := "melee"
 var active_weapon_id := "sidearm"
 var ammo_in_magazine := 12
 var reserve_ammo := 48
-var weapon_magazines: Dictionary = {"sidearm": 12, "smg": 24, "carbine": 20}
-var weapon_reserves: Dictionary = {"sidearm": 48, "smg": 96, "carbine": 80}
 var reload_timer := 0.0
 var reload_duration := 1.45
 var guard_timer := 0.0
@@ -116,6 +115,7 @@ func _environment_label() -> String:
 
 func _ready() -> void:
     _configure_encounter()
+    active_weapon_id = GameState.equipped_weapon_id
     _sync_weapon_ammo()
     player_health = clampf(float(GameState.player_health), 1.0, 100.0)
     stamina_max = GameState.get_max_stamina()
@@ -172,6 +172,7 @@ func _ready() -> void:
 func _configure_encounter() -> void:
     match GameState.current_encounter_id:
         "shop_guard":
+            enemy_archetype_id = "counter_guard"
             enemy_name = "Shopfront agitator"
             enemy_health = 82.0
             enemy_speed = 118.0
@@ -181,6 +182,7 @@ func _configure_encounter() -> void:
             enemy_color = Color("#c58c4e")
             encounter_reward = 40
         "alley_ambush":
+            enemy_archetype_id = "skirmisher"
             enemy_name = "Alley runner"
             enemy_health = 125.0
             enemy_speed = 138.0
@@ -190,6 +192,7 @@ func _configure_encounter() -> void:
             enemy_color = Color("#9e6bb0")
             encounter_reward = 35
         _:
+            enemy_archetype_id = "pressure_brawler"
             enemy_name = "Corner challenger"
             enemy_health = 100.0
             enemy_speed = 92.0
@@ -216,8 +219,8 @@ func _process(delta: float) -> void:
             var loaded := mini(magazine_capacity - ammo_in_magazine, reserve_ammo)
             ammo_in_magazine += loaded
             reserve_ammo -= loaded
-            weapon_magazines[active_weapon_id] = ammo_in_magazine
-            weapon_reserves[active_weapon_id] = reserve_ammo
+            GameState.set_weapon_ammo(active_weapon_id, ammo_in_magazine, reserve_ammo)
+            SaveManager.save_game()
             _set_status("Reload complete — %d / %d rounds." % [ammo_in_magazine, reserve_ammo])
     combo_window_timer = maxf(0.0, combo_window_timer - delta)
     melee_buffer_timer = maxf(0.0, melee_buffer_timer - delta)
@@ -260,8 +263,11 @@ func _process(delta: float) -> void:
         aim_line.visible = aiming and combat_style == "firearms"
         aim_line.position = player.position
         aim_line.rotation = (enemy.position - player.position).angle()
-    if distance > 61.0:
-        enemy.position = enemy.position.move_toward(player.position, enemy_speed * delta)
+    var enemy_movement := EnemyCombatController.get_movement_direction(enemy_archetype_id, player.position, enemy.position, Time.get_ticks_msec() / 1000.0)
+    if enemy_movement != Vector2.ZERO:
+        enemy.position += enemy_movement * enemy_speed * delta
+    enemy.position.x = clampf(enemy.position.x, 205.0, ARENA_SIZE.x - 205.0)
+    enemy.position.y = clampf(enemy.position.y, 205.0, 445.0)
 
     if telegraph_timer >= 0.0:
         telegraph_timer -= delta
@@ -547,7 +553,8 @@ func _firearm_attack() -> void:
         _set_status("Target out of range for %s. Close the distance." % str(profile["name"]))
         return
     ammo_in_magazine -= 1
-    weapon_magazines[active_weapon_id] = ammo_in_magazine
+    GameState.set_weapon_ammo(active_weapon_id, ammo_in_magazine, reserve_ammo)
+    SaveManager.save_game()
     var moving := Input.get_vector("move_left", "move_right", "move_up", "move_down") != Vector2.ZERO
     var aim_ready := aiming and aim_transition_timer <= 0.0
     var unlocked_firearms: Array = GameState.combat_skill_unlocks.get("firearms", [])
@@ -575,13 +582,19 @@ func _reload_firearm() -> void:
     _set_status("Reloading %s — create space. %0.1f seconds." % [str(profile["name"]), duration])
 
 func _sync_weapon_ammo() -> void:
-    ammo_in_magazine = int(weapon_magazines.get(active_weapon_id, 0))
-    reserve_ammo = int(weapon_reserves.get(active_weapon_id, 0))
+    var ammo := GameState.get_weapon_ammo(active_weapon_id)
+    ammo_in_magazine = int(ammo.get("magazine", 0))
+    reserve_ammo = int(ammo.get("reserve", 0))
 
 func _cycle_firearm() -> void:
     if finished or combat_style != "firearms" or reload_timer > 0.0:
         return
-    active_weapon_id = FirearmCombatController.next_weapon(active_weapon_id)
+    var next_weapon := FirearmCombatController.next_owned_weapon(active_weapon_id, GameState.owned_weapons)
+    if next_weapon == active_weapon_id:
+        _set_status("No other firearms owned. Visit Maya's Market to purchase another weapon.")
+        return
+    active_weapon_id = next_weapon
+    GameState.equip_weapon(active_weapon_id)
     _sync_weapon_ammo()
     attack_cooldown = 0.22
     aiming = false
