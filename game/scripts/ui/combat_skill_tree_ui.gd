@@ -12,6 +12,8 @@ var _points_label: Label
 var _tree_title: Label
 var _node_list: VBoxContainer
 var _confirm_respec: ConfirmationDialog
+var _confirm_purchase: ConfirmationDialog
+var _pending_node_id := ""
 
 func _ready() -> void:
     set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -115,6 +117,11 @@ func _build() -> void:
     _confirm_respec.confirmed.connect(_respec)
     add_child(_confirm_respec)
 
+    _confirm_purchase = ConfirmationDialog.new()
+    _confirm_purchase.title = "Unlock combat skill?"
+    _confirm_purchase.confirmed.connect(_confirm_purchase_node)
+    add_child(_confirm_purchase)
+
 func _select_style(style: String) -> void:
     _active_style = style
     _refresh()
@@ -147,7 +154,16 @@ func _refresh(_level: int = 0, _xp: int = 0, _points: int = 0) -> void:
         _node_list.add_child(button)
 
 func _purchase(node_id: String) -> void:
-    if GameState.purchase_combat_skill(_active_style, node_id):
+    var node: Dictionary = CombatSkillTrees.get_tree(_active_style).get("nodes", {}).get(node_id, {})
+    if node.is_empty():
+        return
+    _pending_node_id = node_id
+    _confirm_purchase.dialog_text = "Spend %d skill point(s) to unlock %s?" % [int(node.get("cost", 0)), str(node.get("name", node_id))]
+    _confirm_purchase.popup_centered()
+
+func _confirm_purchase_node() -> void:
+    if not _pending_node_id.is_empty() and GameState.purchase_combat_skill(_active_style, _pending_node_id):
+        _pending_node_id = ""
         _refresh()
 
 func _ask_respec() -> void:
