@@ -32,8 +32,11 @@ var dodge_direction := Vector2.ZERO
 var facing_direction := Vector2.RIGHT
 var finished := false
 var combat_style := "melee"
-var ammo_in_magazine := 8
-var reserve_ammo := 32
+var active_weapon_id := "sidearm"
+var ammo_in_magazine := 12
+var reserve_ammo := 48
+var weapon_magazines: Dictionary = {"sidearm": 12, "smg": 24, "carbine": 20}
+var weapon_reserves: Dictionary = {"sidearm": 48, "smg": 96, "carbine": 80}
 var reload_timer := 0.0
 var reload_duration := 1.45
 var guard_timer := 0.0
@@ -111,6 +114,7 @@ func _environment_label() -> String:
 
 func _ready() -> void:
     _configure_encounter()
+    _sync_weapon_ammo()
     player_health = clampf(float(GameState.player_health), 1.0, 100.0)
     stamina_max = GameState.get_max_stamina()
     stamina = stamina_max
@@ -152,7 +156,7 @@ func _ready() -> void:
 
     var heading := Label.new()
     heading.position = Vector2(24, 166)
-    heading.text = "%s  |  TAB: STYLE   Z: AIM   F: FIRE   R: RELOAD / BODY SHOT   SPACE: COMBO   Q: HEAVY   C: GUARD   SHIFT: DODGE   ESC: RETREAT" % _environment_label()
+    heading.text = "%s  |  TAB: STYLE   G: WEAPON   Z: AIM   F: FIRE   R: RELOAD / BODY SHOT   SPACE: COMBO   Q: HEAVY   C: GUARD   SHIFT: DODGE   ESC: RETREAT" % _environment_label()
     heading.add_theme_color_override("font_color", Color("#d6dce7"))
     add_child(heading)
 
@@ -205,9 +209,12 @@ func _process(delta: float) -> void:
     if reload_timer > 0.0:
         reload_timer -= delta
         if reload_timer <= 0.0:
-            var loaded := mini(8 - ammo_in_magazine, reserve_ammo)
+            var magazine_capacity := int(FirearmCombatController.get_profile(active_weapon_id)["magazine"])
+            var loaded := mini(magazine_capacity - ammo_in_magazine, reserve_ammo)
             ammo_in_magazine += loaded
             reserve_ammo -= loaded
+            weapon_magazines[active_weapon_id] = ammo_in_magazine
+            weapon_reserves[active_weapon_id] = reserve_ammo
             _set_status("Reload complete — %d / %d rounds." % [ammo_in_magazine, reserve_ammo])
     combo_window_timer = maxf(0.0, combo_window_timer - delta)
     if combo_window_timer <= 0.0:
@@ -270,6 +277,9 @@ func _unhandled_input(event: InputEvent) -> void:
             _toggle_combat_style()
         elif event.keycode == KEY_Z:
             _toggle_aim()
+        elif event.keycode == KEY_G:
+            if combat_style == "firearms":
+                _cycle_firearm()
         elif event.keycode == KEY_F:
             if combat_style == "firearms":
                 _firearm_attack()
@@ -295,14 +305,9 @@ func _attack() -> void:
         _set_status("Too far away. Move closer before attacking.")
         return
 
-    var damage := get_combo_damage(GameState.get_attack_damage(), combo_step)
-    if GameState.has_combat_skill("melee", "street_fundamentals"):
-        damage = roundi(float(damage) * (1.10 if combo_step == 2 else 1.0))
-    if combo_step == 2 and GameState.has_combat_skill("melee", "pressure_fighter"):
-        damage = roundi(float(damage) * 1.18)
-    if flank_followup_ready:
-        damage = roundi(float(damage) * (1.35 if GameState.has_combat_skill("melee", "slip_and_return") else 1.20))
-        flank_followup_ready = false
+    var unlocked_melee: Array = GameState.combat_skill_unlocks.get("melee", [])
+    var damage := MeleeCombatController.combo_damage(GameState.get_attack_damage(), combo_step, unlocked_melee, flank_followup_ready)
+    flank_followup_ready = false
     stamina -= ATTACK_COST
     attack_cooldown = 0.42
     combo_step = (combo_step + 1) % 3
@@ -326,9 +331,7 @@ func _heavy_attack() -> void:
     attack_cooldown = 0.78
     combo_step = 0
     combo_window_timer = 0.0
-    var damage := get_heavy_attack_damage(GameState.get_attack_damage())
-    if GameState.has_combat_skill("melee", "counter_specialist"):
-        damage = roundi(float(damage) * 0.90)
+    var damage := MeleeCombatController.heavy_damage(GameState.get_attack_damage(), GameState.combat_skill_unlocks.get("melee", []))
     enemy_health = maxf(0.0, enemy_health - damage)
     enemy.modulate = Color("#ffffff")
 
@@ -354,8 +357,9 @@ func get_heavy_attack_damage(base_damage: int) -> int:
 
 func _dodge() -> void:
     var melee_style := combat_style == "melee"
-    var has_quick_step := melee_style and GameState.has_combat_skill("melee", "quick_step")
-    var dodge_cost := GameState.get_dodge_cost() * (0.88 if has_quick_step else 1.0)
+    var melee_unlocks: Array = GameState.combat_skill_unlocks.get("melee", [])
+    var has_quick_step := melee_style and MeleeCombatController.has_node(melee_unlocks, "quick_step")
+    var dodge_cost := MeleeCombatController.dodge_cost(GameState.get_dodge_cost(), melee_unlocks) if melee_style else GameState.get_dodge_cost()
     if finished or dodge_timer > 0.0 or stamina < dodge_cost:
         return
     var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down")
@@ -365,7 +369,7 @@ func _dodge() -> void:
         direction = Vector2.LEFT
     dodge_direction = direction.normalized()
     stamina -= dodge_cost
-    dodge_timer = 0.24 if has_quick_step else 0.20
+    dodge_timer = MeleeCombatController.dodge_duration(melee_unlocks) if melee_style else 0.20
     if melee_style and telegraph_timer >= 0.0 and (GameState.has_combat_skill("melee", "angle_change") or GameState.has_combat_skill("melee", "slip_and_return")):
         flank_followup_ready = true
     invulnerability_timer = 0.42
@@ -380,7 +384,7 @@ func _resolve_enemy_attack() -> void:
     if guard_timer > 0.0 and combat_style == "melee" and facing_direction.dot(enemy_direction) > 0.35:
         guard_timer = 0.0
         if GameState.has_combat_skill("melee", "counter_window"):
-            var counter_damage := 20.0 * (1.30 if GameState.has_combat_skill("melee", "counter_specialist") else 1.0)
+            var counter_damage := MeleeCombatController.counter_damage(GameState.combat_skill_unlocks.get("melee", []))
             enemy_health = maxf(0.0, enemy_health - counter_damage)
             _set_status("PERFECT BLOCK — counter for %d damage!" % roundi(counter_damage))
             if enemy_health <= 0.0:
@@ -483,7 +487,8 @@ func _set_status(message: String) -> void:
 func _refresh() -> void:
     if stats:
         if combat_style == "firearms":
-            stats.text = "CASH: $%d   FIREARMS   %s   AMMO: %d / %d%s" % [GameState.player_cash, "AIM" if aiming else "HIP", ammo_in_magazine, reserve_ammo, "   RELOADING" if reload_timer > 0.0 else ""]
+            var weapon_profile := FirearmCombatController.get_profile(active_weapon_id)
+            stats.text = "CASH: $%d   %s   %s   AMMO: %d / %d%s" % [GameState.player_cash, str(weapon_profile["name"]).to_upper(), "AIM" if aiming else "HIP", ammo_in_magazine, reserve_ammo, "   RELOADING" if reload_timer > 0.0 else ""]
         else:
             stats.text = "CASH: $%d   FIST FIGHTING   SP: %d" % [GameState.player_cash, GameState.skill_points]
     if player_hp_bar:
@@ -504,7 +509,7 @@ func _toggle_combat_style() -> void:
         aiming = false
     attack_cooldown = 0.05 if GameState.has_combat_skill("firearms", "reposition") else (0.18 if GameState.has_combat_skill("firearms", "snap_aim") else 0.28)
     reload_timer = 0.0
-    _set_status("Combat style: %s. %s" % ["FIREARMS" if combat_style == "firearms" else "FIST FIGHTING", "F fires, R reloads." if combat_style == "firearms" else "SPACE combo, Q heavy, C guard."])
+    _set_status("Combat style: %s. %s" % ["FIREARMS" if combat_style == "firearms" else "FIST FIGHTING", "G weapon, F fire, R reload, Z aim." if combat_style == "firearms" else "SPACE combo, Q heavy, C guard."])
     _refresh()
 
 func _firearm_attack() -> void:
@@ -513,64 +518,54 @@ func _firearm_attack() -> void:
     if ammo_in_magazine <= 0:
         _set_status("Magazine empty — press R to reload.")
         return
+    var profile := FirearmCombatController.get_profile(active_weapon_id)
     var distance := player.position.distance_to(enemy.position)
-    var effective_range := 600.0 if GameState.has_combat_skill("firearms", "cover_awareness") else 520.0
+    var effective_range := float(profile["range"]) + (60.0 if GameState.has_combat_skill("firearms", "cover_awareness") else 0.0)
     if distance > effective_range:
-        _set_status("Target out of range. Close the distance.")
+        _set_status("Target out of range for %s. Close the distance." % str(profile["name"]))
         return
     ammo_in_magazine -= 1
-    var damage := 16.0
+    weapon_magazines[active_weapon_id] = ammo_in_magazine
     var moving := Input.get_vector("move_left", "move_right", "move_up", "move_down") != Vector2.ZERO
     var aim_ready := aiming and aim_transition_timer <= 0.0
-    if aim_ready:
-        damage *= 1.20
-    if moving:
-        damage *= 0.86 if not GameState.has_combat_skill("firearms", "move_and_aim") else 0.96
-    elif aim_ready and GameState.has_combat_skill("firearms", "steady_hands"):
-        damage *= 1.10
-    if GameState.has_combat_skill("firearms", "controlled_burst") and last_shot_timer > 0.0:
-        damage *= 1.12
-    if ammo_in_magazine <= 2 and GameState.has_combat_skill("firearms", "last_round_focus"):
-        damage *= 1.08
-    if aim_ready and GameState.has_combat_skill("firearms", "precision_specialist"):
-        damage *= 1.15
-    if GameState.has_combat_skill("firearms", "mobile_operator") and last_shot_timer > 0.0:
-        damage *= 0.92
-    if GameState.has_combat_skill("firearms", "mobile_operator"):
-        attack_cooldown = 0.36
-    elif GameState.has_combat_skill("firearms", "snap_aim"):
-        attack_cooldown = 0.38
-    else:
-        attack_cooldown = 0.48
-    if GameState.has_combat_skill("firearms", "precision_specialist"):
-        attack_cooldown += 0.04
-    if aim_recovery_timer > 0.0 and GameState.has_combat_skill("firearms", "composure"):
-        attack_cooldown *= 0.82
+    var unlocked_firearms: Array = GameState.combat_skill_unlocks.get("firearms", [])
+    var damage := FirearmCombatController.get_shot_damage(active_weapon_id, aim_ready, moving, unlocked_firearms, last_shot_timer > 0.0, ammo_in_magazine, aim_recovery_timer > 0.0)
+    attack_cooldown = FirearmCombatController.get_shot_cooldown(active_weapon_id, unlocked_firearms)
     last_shot_timer = 0.72
     enemy_health = maxf(0.0, enemy_health - damage)
     enemy.modulate = Color("#fff2c9")
     if enemy_health <= 0.0:
         _win_encounter()
     else:
-        _set_status("HIT CONFIRMED — %d damage. %d rounds remain." % [roundi(damage), ammo_in_magazine])
+        _set_status("%s — HIT CONFIRMED: %d damage. %d rounds remain." % [str(profile["name"]), roundi(damage), ammo_in_magazine])
     _refresh()
 
 func _reload_firearm() -> void:
     if finished or combat_style != "firearms" or reload_timer > 0.0:
         return
-    if ammo_in_magazine >= 8 or reserve_ammo <= 0:
+    var profile := FirearmCombatController.get_profile(active_weapon_id)
+    if ammo_in_magazine >= int(profile["magazine"]) or reserve_ammo <= 0:
         _set_status("Reload unavailable — magazine full or reserve empty.")
         return
-    var duration := reload_duration
-    if GameState.has_combat_skill("firearms", "fast_hands"):
-        duration *= 0.92
-    if GameState.has_combat_skill("firearms", "quick_reload"):
-        duration *= 0.84
-    if ammo_in_magazine > 0 and GameState.has_combat_skill("firearms", "ammo_discipline"):
-        duration *= 0.88
+    var duration := FirearmCombatController.get_reload_duration(active_weapon_id, ammo_in_magazine, GameState.combat_skill_unlocks.get("firearms", []))
     reload_timer = duration
     attack_cooldown = maxf(attack_cooldown, duration)
-    _set_status("Reloading — create space. %0.1f seconds." % duration)
+    _set_status("Reloading %s — create space. %0.1f seconds." % [str(profile["name"]), duration])
+
+func _sync_weapon_ammo() -> void:
+    ammo_in_magazine = int(weapon_magazines.get(active_weapon_id, 0))
+    reserve_ammo = int(weapon_reserves.get(active_weapon_id, 0))
+
+func _cycle_firearm() -> void:
+    if finished or combat_style != "firearms" or reload_timer > 0.0:
+        return
+    active_weapon_id = FirearmCombatController.next_weapon(active_weapon_id)
+    _sync_weapon_ammo()
+    attack_cooldown = 0.22
+    aiming = false
+    var profile := FirearmCombatController.get_profile(active_weapon_id)
+    _set_status("Equipped %s — %s  [G: next weapon]" % [str(profile["name"]), str(profile["description"])])
+    _refresh()
 
 func _body_shot() -> void:
     if finished or not GameState.has_combat_skill("melee", "body_shot"):
