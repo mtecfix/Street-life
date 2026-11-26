@@ -27,7 +27,7 @@ func _run_tests() -> void:
     arena.combat_style = "firearms"
     var starting_health: float = arena.enemy_health
     arena._firearm_attack()
-    _check(arena.ammo_in_magazine == 7, "Firing should consume one magazine round.")
+    _check(arena.ammo_in_magazine == 11, "The 12-round sidearm should consume one magazine round.")
     _check(arena.enemy_health < starting_health, "An in-range firearm shot should damage the opponent.")
 
     arena.ammo_in_magazine = 0
@@ -37,6 +37,14 @@ func _run_tests() -> void:
     arena.reload_timer = 0.01
     arena._process(0.02)
     _check(arena.ammo_in_magazine == 5 and arena.reserve_ammo == 0, "Reload should transfer only available reserve ammunition.")
+
+    arena._cycle_firearm()
+    _check(arena.active_weapon_id == "smg" and arena.ammo_in_magazine == 24, "Cycling to the SMG should load its independent magazine.")
+    arena._cycle_firearm()
+    _check(arena.active_weapon_id == "carbine" and arena.ammo_in_magazine == 20, "Cycling to the carbine should load its independent magazine.")
+    arena._cycle_firearm()
+    _check(arena.active_weapon_id == "sidearm" and arena.ammo_in_magazine == 5, "Returning to the sidearm should retain its magazine state.")
+    _check(not arena._has_clear_shot(Vector2(40, 325), Vector2(150, 325)), "Arena cover should block a shot crossing its footprint.")
 
     state.combat_skill_unlocks = {"melee": ["guard_up", "counter_window", "body_shot"], "firearms": []}
     arena.combat_style = "melee"
