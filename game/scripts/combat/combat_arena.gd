@@ -24,6 +24,8 @@ var stamina_max := 100.0
 var attack_cooldown := 0.0
 var combo_step := 0
 var combo_window_timer := 0.0
+var melee_buffer_timer := 0.0
+var buffered_heavy_attack := false
 var enemy_recovery := 0.0
 var telegraph_timer := -1.0
 var dodge_timer := 0.0
@@ -217,6 +219,14 @@ func _process(delta: float) -> void:
             weapon_reserves[active_weapon_id] = reserve_ammo
             _set_status("Reload complete — %d / %d rounds." % [ammo_in_magazine, reserve_ammo])
     combo_window_timer = maxf(0.0, combo_window_timer - delta)
+    melee_buffer_timer = maxf(0.0, melee_buffer_timer - delta)
+    if melee_buffer_timer > 0.0 and attack_cooldown <= 0.0 and combat_style == "melee":
+        melee_buffer_timer = 0.0
+        if buffered_heavy_attack:
+            _heavy_attack()
+        else:
+            _attack()
+        buffered_heavy_attack = false
     if combo_window_timer <= 0.0:
         combo_step = 0
     enemy_recovery = maxf(0.0, enemy_recovery - delta)
@@ -291,9 +301,17 @@ func _unhandled_input(event: InputEvent) -> void:
         elif event.keycode == KEY_C:
             _guard()
         elif event.keycode == KEY_SPACE:
-            _attack()
+            if combat_style == "melee" and attack_cooldown > 0.0:
+                melee_buffer_timer = 0.16
+                buffered_heavy_attack = false
+            else:
+                _attack()
         elif event.keycode == KEY_Q:
-            _heavy_attack()
+            if combat_style == "melee" and attack_cooldown > 0.0:
+                melee_buffer_timer = 0.16
+                buffered_heavy_attack = true
+            else:
+                _heavy_attack()
         elif event.keycode == KEY_SHIFT:
             _dodge()
 
@@ -520,6 +538,9 @@ func _firearm_attack() -> void:
         return
     var profile := FirearmCombatController.get_profile(active_weapon_id)
     var distance := player.position.distance_to(enemy.position)
+    if not _has_clear_shot(player.position, enemy.position):
+        _set_status("LINE OF SIGHT BLOCKED — reposition around the obstacle.")
+        return
     var effective_range := float(profile["range"]) + (60.0 if GameState.has_combat_skill("firearms", "cover_awareness") else 0.0)
     if distance > effective_range:
         _set_status("Target out of range for %s. Close the distance." % str(profile["name"]))
@@ -566,6 +587,44 @@ func _cycle_firearm() -> void:
     var profile := FirearmCombatController.get_profile(active_weapon_id)
     _set_status("Equipped %s — %s  [G: next weapon]" % [str(profile["name"]), str(profile["description"])])
     _refresh()
+
+
+func _cover_rectangles() -> Array[Rect2]:
+    match environment_kind:
+        "shopfront":
+            return [Rect2(62, 214, 86, 72), Rect2(790, 330, 92, 58)]
+        "alley":
+            return [Rect2(34, 220, 126, 112), Rect2(806, 330, 112, 70)]
+        _:
+            return [Rect2(66, 292, 40, 66)]
+
+func _has_clear_shot(from_point: Vector2, to_point: Vector2) -> bool:
+    for obstacle in _cover_rectangles():
+        if obstacle.has_point(from_point) or obstacle.has_point(to_point):
+            continue
+        var top_left := obstacle.position
+        var top_right := Vector2(obstacle.end.x, obstacle.position.y)
+        var bottom_left := Vector2(obstacle.position.x, obstacle.end.y)
+        var bottom_right := obstacle.end
+        if _segments_intersect(from_point, to_point, top_left, top_right):
+            return false
+        if _segments_intersect(from_point, to_point, top_right, bottom_right):
+            return false
+        if _segments_intersect(from_point, to_point, bottom_right, bottom_left):
+            return false
+        if _segments_intersect(from_point, to_point, bottom_left, top_left):
+            return false
+    return true
+
+func _segments_intersect(a: Vector2, b: Vector2, c: Vector2, d: Vector2) -> bool:
+    var ab := b - a
+    var cd := d - c
+    var denominator := ab.cross(cd)
+    if absf(denominator) < 0.0001:
+        return false
+    var t := (c - a).cross(cd) / denominator
+    var u := (c - a).cross(ab) / denominator
+    return t >= 0.0 and t <= 1.0 and u >= 0.0 and u <= 1.0
 
 func _body_shot() -> void:
     if finished or not GameState.has_combat_skill("melee", "body_shot"):
