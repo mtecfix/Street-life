@@ -63,6 +63,12 @@ static func get_reload_duration(weapon_id: String, current_magazine: int, unlock
         duration *= 0.88
     return duration
 
-static func next_weapon(current_weapon: String) -> String:
-    var index := WEAPON_ORDER.find(current_weapon)
-    return WEAPON_ORDER[(index + 1) % WEAPON_ORDER.size()]
+static func next_owned_weapon(current_weapon: String, owned_weapons: Array) -> String:
+    var available: Array[String] = []
+    for weapon_id in WEAPON_ORDER:
+        if weapon_id in owned_weapons:
+            available.append(weapon_id)
+    if available.is_empty():
+        return "sidearm"
+    var index := available.find(current_weapon)
+    return available[(index + 1) % available.size()]
