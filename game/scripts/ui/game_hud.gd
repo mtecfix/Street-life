@@ -29,9 +29,13 @@ var _location_label: Label
 var _clock_label: Label
 var _map: Control
 var _last_snapshot := ""
+var _combat_skill_ui: Control
 
 func _ready() -> void:
     _build_interface()
+    var skill_ui_script = preload("res://scripts/ui/combat_skill_tree_ui.gd")
+    _combat_skill_ui = skill_ui_script.new()
+    add_child(_combat_skill_ui)
     _refresh()
     # Event-driven refreshes make state changes appear immediately. A light
     # process refresh remains as a safety net for time and movement updates.
@@ -78,7 +82,7 @@ func _build_interface() -> void:
     # bindings remain unchanged.
     var controls := _panel(Vector2(18, 474), Vector2(510, 48))
     var control_label := _label(controls, Vector2(12, 7), Vector2(486, 34), 11, TEXT_MUTED)
-    control_label.text = "MOVE  WASD / ARROWS     INTERACT  E     INVENTORY  I     SNACK  F     MEDKIT  H"
+    control_label.text = "MOVE  WASD / ARROWS     INTERACT  E     INVENTORY  I     SKILLS  K     SNACK  F     MEDKIT  H"
 
 func _panel(at: Vector2, dimensions: Vector2) -> PanelContainer:
     var panel := PanelContainer.new()
@@ -174,3 +178,10 @@ func _on_hustle_completed(_hustle_id: String, _day: int, _cash: int, _xp: int) -
 
 func _on_event_completed(_event_id: String, _day: int) -> void:
     _refresh()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+    if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_K:
+        if is_instance_valid(_combat_skill_ui):
+            _combat_skill_ui.toggle()
+            get_viewport().set_input_as_handled()
