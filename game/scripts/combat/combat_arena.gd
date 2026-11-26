@@ -30,6 +30,14 @@ var dodge_timer := 0.0
 var invulnerability_timer := 0.0
 var dodge_direction := Vector2.ZERO
 var finished := false
+var combat_style := "melee"
+var ammo_in_magazine := 8
+var reserve_ammo := 32
+var reload_timer := 0.0
+var reload_duration := 1.45
+var guard_timer := 0.0
+var flank_followup_ready := false
+var last_shot_timer := 0.0
 
 var player: Polygon2D
 var enemy: Polygon2D
@@ -140,7 +148,7 @@ func _ready() -> void:
     status.position = Vector2(24, 490)
     status.add_theme_font_size_override("font_size", 16)
     add_child(status)
-    _set_status("Face %s. Watch for the red attack warning." % enemy_name)
+    _set_status("Face %s. TAB switches combat style; K opens training." % enemy_name)
     _refresh()
 
 func _configure_encounter() -> void:
@@ -178,6 +186,15 @@ func _process(delta: float) -> void:
         return
 
     attack_cooldown = maxf(0.0, attack_cooldown - delta)
+    guard_timer = maxf(0.0, guard_timer - delta)
+    last_shot_timer = maxf(0.0, last_shot_timer - delta)
+    if reload_timer > 0.0:
+        reload_timer -= delta
+        if reload_timer <= 0.0:
+            var loaded := mini(8 - ammo_in_magazine, reserve_ammo)
+            ammo_in_magazine += loaded
+            reserve_ammo -= loaded
+            _set_status("Reload complete — %d / %d rounds." % [ammo_in_magazine, reserve_ammo])
     combo_window_timer = maxf(0.0, combo_window_timer - delta)
     if combo_window_timer <= 0.0:
         combo_step = 0
@@ -190,7 +207,10 @@ func _process(delta: float) -> void:
         player.position += dodge_direction * 510.0 * delta
     else:
         var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down")
-        player.position += direction * GameState.get_player_speed() * delta
+        var move_speed := GameState.get_player_speed()
+        if combat_style == "firearms" and GameState.has_combat_skill("firearms", "mobile_operator"):
+            move_speed *= 1.08
+        player.position += direction * move_speed * delta
 
     var horizontal_margin := 210.0 if environment_kind == "alley" else 38.0
     player.position.x = clampf(player.position.x, horizontal_margin, ARENA_SIZE.x - horizontal_margin)
@@ -221,7 +241,19 @@ func _unhandled_input(event: InputEvent) -> void:
     if event.is_action_pressed("ui_cancel"):
         _return_to_neighborhood()
     elif event is InputEventKey and event.pressed and not event.echo:
-        if event.keycode == KEY_SPACE:
+        if event.keycode == KEY_TAB:
+            _toggle_combat_style()
+        elif event.keycode == KEY_F:
+            if combat_style == "firearms":
+                _firearm_attack()
+        elif event.keycode == KEY_R:
+            if combat_style == "firearms":
+                _reload_firearm()
+            else:
+                _body_shot()
+        elif event.keycode == KEY_C:
+            _guard()
+        elif event.keycode == KEY_SPACE:
             _attack()
         elif event.keycode == KEY_Q:
             _heavy_attack()
@@ -229,17 +261,22 @@ func _unhandled_input(event: InputEvent) -> void:
             _dodge()
 
 func _attack() -> void:
-    if finished or attack_cooldown > 0.0 or stamina < ATTACK_COST:
+    if combat_style != "melee" or finished or attack_cooldown > 0.0 or stamina < ATTACK_COST:
         return
     if player.position.distance_to(enemy.position) > PLAYER_ATTACK_RANGE:
         _set_status("Too far away. Move closer before attacking.")
         return
 
     var damage := get_combo_damage(GameState.get_attack_damage(), combo_step)
+    if combo_step == 2 and GameState.has_combat_skill("melee", "pressure_fighter"):
+        damage = roundi(float(damage) * 1.18)
+    if flank_followup_ready:
+        damage = roundi(float(damage) * 1.20)
+        flank_followup_ready = false
     stamina -= ATTACK_COST
     attack_cooldown = 0.42
     combo_step = (combo_step + 1) % 3
-    combo_window_timer = 0.85
+    combo_window_timer = 0.85 * (1.15 if GameState.has_combat_skill("melee", "combination_flow") else 1.0)
     enemy_health = maxf(0.0, enemy_health - damage)
     enemy.modulate = Color("#ffffff")
     if enemy_health <= 0.0:
@@ -249,7 +286,7 @@ func _attack() -> void:
         _set_status("%s — %d damage. Press Q for a heavy strike." % [combo_label, damage])
 
 func _heavy_attack() -> void:
-    if finished or attack_cooldown > 0.0 or stamina < HEAVY_ATTACK_COST:
+    if combat_style != "melee" or finished or attack_cooldown > 0.0 or stamina < HEAVY_ATTACK_COST:
         return
     if player.position.distance_to(enemy.position) > PLAYER_ATTACK_RANGE:
         _set_status("Heavy strike out of range. Move closer.")
@@ -284,7 +321,8 @@ func get_heavy_attack_damage(base_damage: int) -> int:
     return roundi(float(base_damage) * 1.8)
 
 func _dodge() -> void:
-    if finished or dodge_timer > 0.0 or stamina < GameState.get_dodge_cost():
+    var dodge_cost := GameState.get_dodge_cost() * (0.88 if GameState.has_combat_skill("melee", "quick_step") else 1.0)
+    if finished or dodge_timer > 0.0 or stamina < dodge_cost:
         return
     var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down")
     if direction == Vector2.ZERO:
@@ -292,8 +330,10 @@ func _dodge() -> void:
     if direction == Vector2.ZERO:
         direction = Vector2.LEFT
     dodge_direction = direction.normalized()
-    stamina -= GameState.get_dodge_cost()
-    dodge_timer = 0.20
+    stamina -= dodge_cost
+    dodge_timer = 0.24 if GameState.has_combat_skill("melee", "quick_step") else 0.20
+    if telegraph_timer >= 0.0 and GameState.has_combat_skill("melee", "angle_change"):
+        flank_followup_ready = true
     invulnerability_timer = 0.42
     if telegraph_timer >= 0.0:
         _set_status("Dodge! Create space before the opponent's next move.")
@@ -302,7 +342,17 @@ func _resolve_enemy_attack() -> void:
     telegraph_timer = -1.0
     telegraph.visible = false
     enemy_recovery = 1.05
-    if player.position.distance_to(enemy.position) <= enemy_attack_range + 20.0 and invulnerability_timer <= 0.0:
+    if guard_timer > 0.0 and combat_style == "melee":
+        guard_timer = 0.0
+        if GameState.has_combat_skill("melee", "counter_window"):
+            var counter_damage := 20.0 * (1.30 if GameState.has_combat_skill("melee", "counter_specialist") else 1.0)
+            enemy_health = maxf(0.0, enemy_health - counter_damage)
+            _set_status("PERFECT BLOCK — counter for %d damage!" % roundi(counter_damage))
+            if enemy_health <= 0.0:
+                _win_encounter()
+        else:
+            _set_status("BLOCKED! You absorbed the incoming strike.")
+    elif player.position.distance_to(enemy.position) <= enemy_attack_range + 20.0 and invulnerability_timer <= 0.0:
         player_health = maxf(0.0, player_health - enemy_damage)
         GameState.player_health = int(player_health)
         _set_status("You took a hit. Use SHIFT to dodge the next warning.")
@@ -396,10 +446,114 @@ func _set_status(message: String) -> void:
 
 func _refresh() -> void:
     if stats:
-        stats.text = "CASH: $%d" % GameState.player_cash
+        if combat_style == "firearms":
+            stats.text = "CASH: $%d   FIREARMS   AMMO: %d / %d%s" % [GameState.player_cash, ammo_in_magazine, reserve_ammo, "   RELOADING" if reload_timer > 0.0 else ""]
+        else:
+            stats.text = "CASH: $%d   FIST FIGHTING   SP: %d" % [GameState.player_cash, GameState.skill_points]
     if player_hp_bar:
         player_hp_bar.value = player_health
     if enemy_hp_bar:
         enemy_hp_bar.value = enemy_health
     if stamina_bar:
         stamina_bar.value = stamina
+
+
+func _toggle_combat_style() -> void:
+    if finished:
+        return
+    combat_style = "firearms" if combat_style == "melee" else "melee"
+    attack_cooldown = 0.0
+    reload_timer = 0.0
+    _set_status("Combat style: %s. %s" % ["FIREARMS" if combat_style == "firearms" else "FIST FIGHTING", "F fires, R reloads." if combat_style == "firearms" else "SPACE combo, Q heavy, C guard."])
+    _refresh()
+
+func _firearm_attack() -> void:
+    if finished or combat_style != "firearms" or attack_cooldown > 0.0 or reload_timer > 0.0:
+        return
+    if ammo_in_magazine <= 0:
+        _set_status("Magazine empty — press R to reload.")
+        return
+    var distance := player.position.distance_to(enemy.position)
+    if distance > 520.0:
+        _set_status("Target out of range. Close the distance.")
+        return
+    ammo_in_magazine -= 1
+    var damage := 18.0
+    var moving := Input.get_vector("move_left", "move_right", "move_up", "move_down") != Vector2.ZERO
+    if not moving and GameState.has_combat_skill("firearms", "steady_hands"):
+        damage *= 1.10
+    if GameState.has_combat_skill("firearms", "controlled_burst") and last_shot_timer > 0.0:
+        damage *= 1.12
+    if ammo_in_magazine <= 2 and GameState.has_combat_skill("firearms", "last_round_focus"):
+        damage *= 1.08
+    if GameState.has_combat_skill("firearms", "precision_specialist"):
+        damage *= 1.15
+    if GameState.has_combat_skill("firearms", "mobile_operator"):
+        attack_cooldown = 0.36
+    elif GameState.has_combat_skill("firearms", "snap_aim"):
+        attack_cooldown = 0.38
+    else:
+        attack_cooldown = 0.48
+    if GameState.has_combat_skill("firearms", "precision_specialist"):
+        attack_cooldown += 0.04
+    last_shot_timer = 0.72
+    enemy_health = maxf(0.0, enemy_health - damage)
+    enemy.modulate = Color("#fff2c9")
+    if enemy_health <= 0.0:
+        _win_encounter()
+    else:
+        _set_status("HIT CONFIRMED — %d damage. %d rounds remain." % [roundi(damage), ammo_in_magazine])
+    _refresh()
+
+func _reload_firearm() -> void:
+    if finished or combat_style != "firearms" or reload_timer > 0.0:
+        return
+    if ammo_in_magazine >= 8 or reserve_ammo <= 0:
+        _set_status("Reload unavailable — magazine full or reserve empty.")
+        return
+    var duration := reload_duration
+    if GameState.has_combat_skill("firearms", "fast_hands"):
+        duration *= 0.92
+    if GameState.has_combat_skill("firearms", "quick_reload"):
+        duration *= 0.84
+    if ammo_in_magazine > 0 and GameState.has_combat_skill("firearms", "ammo_discipline"):
+        duration *= 0.88
+    reload_timer = duration
+    attack_cooldown = maxf(attack_cooldown, duration)
+    _set_status("Reloading — create space. %0.1f seconds." % duration)
+
+func _body_shot() -> void:
+    if finished or not GameState.has_combat_skill("melee", "body_shot"):
+        _set_status("Body Shot is locked. Unlock it in Combat Training (K).")
+        return
+    if attack_cooldown > 0.0 or stamina < 28.0:
+        _set_status("Not ready — recover stamina before a body shot.")
+        return
+    if player.position.distance_to(enemy.position) > PLAYER_ATTACK_RANGE:
+        _set_status("Body shot out of range.")
+        return
+    stamina -= 28.0
+    attack_cooldown = 0.72
+    combo_step = 0
+    var interrupted := telegraph_timer >= 0.0
+    enemy_health = maxf(0.0, enemy_health - 34.0)
+    if interrupted:
+        telegraph_timer = -1.0
+        telegraph.visible = false
+        enemy_recovery = 1.0
+    if enemy_health <= 0.0:
+        _win_encounter()
+    else:
+        _set_status("BODY SHOT — 34 damage%s." % ("; attack interrupted" if interrupted else ""))
+
+func _guard() -> void:
+    if finished or combat_style != "melee":
+        return
+    if not GameState.has_combat_skill("melee", "guard_up"):
+        _set_status("Guard Up is locked. Unlock it in Combat Training (K).")
+        return
+    if stamina < 8.0 or guard_timer > 0.0:
+        return
+    stamina -= 8.0
+    guard_timer = 0.52
+    _set_status("GUARD UP — hold your ground for the incoming strike.")
