@@ -89,3 +89,13 @@ Successful player hits now show floating damage labels and brief target flashes.
 - Factions modify enemy speed, damage, attack windup, and recovery. Market Crew opponents hit harder but telegraph more slowly; Alley Runners are faster and lighter-hitting with quicker recovery; Corner Set is the baseline.
 - Faction modifiers are data-driven in `EnemyCombatController`, independently testable, and designed to extend to multi-member crew encounters.
 - This slice does not yet spawn multiple combatants. Group spawning, target selection, and coordinated multi-enemy attack scheduling remain the next arena architecture step.
+
+
+## Sequential rival crew encounters
+
+- Each combat mission now has a data-driven roster of opponents in `EncounterWaveController`.
+- Corner Set and Market Crew encounters contain two sequential opponents; the Alley Runners ambush escalates through three.
+- Defeating an opponent brings in the next crew member without ending the encounter. Player health, stamina, ammunition, and encounter rewards carry through the waves; the payout and mission completion are awarded only after the final opponent.
+- Each wave can specify its own name, archetype, faction, health, movement speed, attack range, damage, and windup.
+- The current arena remains a single-target duel at any given moment. Simultaneous enemies, target switching, crowd spacing, and coordinated group attacks are not included in this slice.
+- Developer validation should check each wave transition, health-bar scaling, telegraph reset, ammunition persistence, final-only rewards, and defeat handling at every wave.
