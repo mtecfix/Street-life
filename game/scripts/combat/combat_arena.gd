@@ -276,6 +276,8 @@ func _attack() -> void:
         return
 
     var damage := get_combo_damage(GameState.get_attack_damage(), combo_step)
+    if GameState.has_combat_skill("melee", "street_fundamentals"):
+        damage = roundi(float(damage) * (1.10 if combo_step == 2 else 1.0))
     if combo_step == 2 and GameState.has_combat_skill("melee", "pressure_fighter"):
         damage = roundi(float(damage) * 1.18)
     if flank_followup_ready:
