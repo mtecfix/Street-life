@@ -175,7 +175,7 @@ The first playable integration now builds on the design above. The current branc
 
 ### Prototype boundaries
 
-This is a functional first pass, not the final combat presentation. The arena still uses its existing polygon actors and simplified enemy behavior. Firearms currently use deterministic in-range hit resolution rather than projectile physics or line-of-sight; cover is represented by an extended acquisition-range upgrade, not physical cover. Weapon-specific animations, audio, recoil, enemy firearm behavior, and a dedicated weapon inventory are not included. The two attack styles are currently routed through the existing arena script; extracting them into separate controller scripts is a follow-up architecture task.
+This is a functional first pass, not the final combat presentation. The arena still uses its existing polygon actors and simplified enemy behavior. Melee input has a short buffer near the end of attack recovery to make combo inputs less brittle. Firearms currently use deterministic hit resolution rather than projectile physics, but shots now respect simple line-of-sight checks against the arena's cover props. The `Cover Awareness` upgrade extends acquisition range; it does not let shots pass through obstacles. Weapon-specific animations, audio, recoil, enemy firearm behavior, and a persistent equipment inventory are not included. The combat encounter now offers three temporary weapon loadouts (9mm Sidearm, Compact SMG, Street Carbine), each with its own magazine, reserve pool, range, damage, cadence, and reload profile. The arena delegates reusable melee calculations to `MeleeCombatController` and firearm profiles/handling to `FirearmCombatController`; encounter lifecycle and presentation remain in the arena. This is an incremental controller boundary, not a full scene-level actor/controller rewrite.
 
 ### Controls
 
@@ -213,3 +213,11 @@ References:
 - [The Logic Behind Violence: A Primer on Combat System Design — Game Developer](https://www.gamedeveloper.com/design/the-logic-behind-violence-a-primer-on-combat-system-design)
 - [Godot 4.3: Saving games](https://docs.godotengine.org/en/4.3/tutorials/io/saving_games.html)
 - [Godot 4.3: Using CharacterBody2D](https://docs.godotengine.org/en/4.3/tutorials/physics/using_character_body_2d.html)
+
+
+### Additional implementation — controller separation and loadouts
+
+- `MeleeCombatController` centralizes combo, heavy-strike, dodge, and counter calculations. The arena remains responsible for stamina consumption, hit presentation, enemy state, and encounter rewards.
+- `FirearmCombatController` owns three distinct weapon profiles and the calculations for shot damage, cadence, and reload timing. Press **G** during a firearms encounter to cycle between the sidearm, SMG, and carbine. Each weapon retains its own loaded and reserve ammunition for the duration of that encounter.
+- Ranged shots are checked against the visible arena cover props. A blocked shot produces explicit line-of-sight feedback; players must reposition rather than shoot through obstacles.
+- Melee light/heavy inputs have a short late-recovery buffer. **Composure** now shortens post-hit aim recovery rather than adding unrelated damage.
