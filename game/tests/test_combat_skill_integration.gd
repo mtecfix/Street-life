@@ -41,6 +41,7 @@ func _run_tests() -> void:
     arena._firearm_attack()
     _check(arena.ammo_in_magazine == 11, "The 12-round sidearm should consume one magazine round.")
     _check(arena.enemy_health < starting_health, "An in-range firearm shot should damage the opponent.")
+    _check(arena.combat_popups.size() > 0, "Successful hits should display floating combat feedback.")
 
     arena.ammo_in_magazine = 0
     arena.reserve_ammo = 5
