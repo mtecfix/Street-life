@@ -211,6 +211,7 @@ func _configure_encounter() -> void:
 
 func _process(delta: float) -> void:
     if finished:
+        _update_combat_popups(delta)
         return
 
     attack_cooldown = maxf(0.0, attack_cooldown - delta)
