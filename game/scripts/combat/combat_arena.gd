@@ -191,8 +191,6 @@ func _configure_encounter() -> void:
             enemy_windup = 0.78
             enemy_color = Color("#d66a55")
             encounter_reward = 50
-    if GameState.has_combat_skill("firearms", "combat_awareness"):
-        enemy_windup += 0.12
 
 func _process(delta: float) -> void:
     if finished:
@@ -352,7 +350,9 @@ func get_heavy_attack_damage(base_damage: int) -> int:
     return roundi(float(base_damage) * 1.8)
 
 func _dodge() -> void:
-    var dodge_cost := GameState.get_dodge_cost() * (0.88 if GameState.has_combat_skill("melee", "quick_step") else 1.0)
+    var melee_style := combat_style == "melee"
+    var has_quick_step := melee_style and GameState.has_combat_skill("melee", "quick_step")
+    var dodge_cost := GameState.get_dodge_cost() * (0.88 if has_quick_step else 1.0)
     if finished or dodge_timer > 0.0 or stamina < dodge_cost:
         return
     var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down")
@@ -362,8 +362,8 @@ func _dodge() -> void:
         direction = Vector2.LEFT
     dodge_direction = direction.normalized()
     stamina -= dodge_cost
-    dodge_timer = 0.24 if GameState.has_combat_skill("melee", "quick_step") else 0.20
-    if telegraph_timer >= 0.0 and (GameState.has_combat_skill("melee", "angle_change") or GameState.has_combat_skill("melee", "slip_and_return")):
+    dodge_timer = 0.24 if has_quick_step else 0.20
+    if melee_style and telegraph_timer >= 0.0 and (GameState.has_combat_skill("melee", "angle_change") or GameState.has_combat_skill("melee", "slip_and_return")):
         flank_followup_ready = true
     invulnerability_timer = 0.42
     if telegraph_timer >= 0.0:
@@ -494,6 +494,8 @@ func _toggle_combat_style() -> void:
     if finished:
         return
     combat_style = "firearms" if combat_style == "melee" else "melee"
+    if GameState.has_combat_skill("firearms", "combat_awareness"):
+        enemy_windup += 0.12 if combat_style == "firearms" else -0.12
     if combat_style == "melee":
         aiming = false
     attack_cooldown = 0.05 if GameState.has_combat_skill("firearms", "reposition") else (0.18 if GameState.has_combat_skill("firearms", "snap_aim") else 0.28)
