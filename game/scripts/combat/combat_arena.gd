@@ -404,7 +404,7 @@ func _dodge() -> void:
 func _resolve_enemy_attack() -> void:
     telegraph_timer = -1.0
     telegraph.visible = false
-    enemy_recovery = 1.05
+    enemy_recovery = EnemyCombatController.get_recovery_duration(enemy_archetype_id)
     var enemy_direction := (enemy.position - player.position).normalized()
     if guard_timer > 0.0 and combat_style == "melee" and facing_direction.dot(enemy_direction) > 0.35:
         guard_timer = 0.0
