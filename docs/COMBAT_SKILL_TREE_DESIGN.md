@@ -169,13 +169,13 @@ The first playable integration now builds on the design above. The current branc
 
 - An in-game **Combat Training** panel opened with **K** from the neighborhood HUD, with separate Fist Fighting and Firearms tabs, point costs, prerequisite-aware locked/available/unlocked states, and a confirmation before respec.
 - Purchases, unlock IDs, and respec refunds owned by `GameState`; the existing level-up skill-point pool is shared, while each discipline has independent unlocks.
-- Save format version 6 stores the two unlock lists. Older v1–v5 saves remain loadable and simply start with empty combat trees.
+- Save format version 7 stores combat unlocks, weapon ownership, equipped weapon, and ammunition. Older v1–v6 saves remain loadable and migrate with the starter sidearm and empty combat trees.
 - A playable arena prototype with **TAB** switching between fist fighting and firearms. Firearms include aim mode (**Z**), firing (**F**), an on-screen aim line, magazine/reserve ammunition, reload timing (**R**), hit confirmation, and distinct handling bonuses. Melee includes the existing combo/heavy/dodge loop plus unlockable guard (**C**), body shot (**R**), counter, combo, and dodge-follow-up effects.
 - A focused Godot 4.3 GitHub Actions workflow and a regression test for purchases, prerequisites, independent trees, persistence, and respec.
 
 ### Prototype boundaries
 
-This is a functional first pass, not the final combat presentation. The arena still uses its existing polygon actors and simplified enemy behavior. Melee input has a short buffer near the end of attack recovery to make combo inputs less brittle. Firearms currently use deterministic hit resolution rather than projectile physics, but shots now respect simple line-of-sight checks against the arena's cover props. The `Cover Awareness` upgrade extends acquisition range; it does not let shots pass through obstacles. Weapon-specific animations, audio, recoil, enemy firearm behavior, and a persistent equipment inventory are not included. The combat encounter now offers three temporary weapon loadouts (9mm Sidearm, Compact SMG, Street Carbine), each with its own magazine, reserve pool, range, damage, cadence, and reload profile. The arena delegates reusable melee calculations to `MeleeCombatController` and firearm profiles/handling to `FirearmCombatController`; encounter lifecycle and presentation remain in the arena. This is an incremental controller boundary, not a full scene-level actor/controller rewrite.
+This is a functional first pass, not the final combat presentation. The arena still uses its existing polygon actors and simplified enemy behavior. Melee input has a short buffer near the end of attack recovery to make combo inputs less brittle. Firearms currently use deterministic hit resolution rather than projectile physics, but shots now respect simple line-of-sight checks against the arena's cover props. The `Cover Awareness` upgrade extends acquisition range; it does not let shots pass through obstacles. Weapon-specific animations, audio, recoil, and enemy firearm behavior are not included. The player now owns persistent weapon loadouts (9mm Sidearm, Compact SMG, Street Carbine), each with its own magazine, reserve pool, range, damage, cadence, and reload profile. The arena delegates reusable melee calculations to `MeleeCombatController` and firearm profiles/handling to `FirearmCombatController`; encounter lifecycle and presentation remain in the arena. This is an incremental controller boundary, not a full scene-level actor/controller rewrite.
 
 ### Controls
 
@@ -244,3 +244,11 @@ The next gameplay slice replaces encounter-only firearm access with permanent ow
 - `test_weapon_inventory.gd` covers purchase costs, duplicate/unknown rejection, equip rules, ammo persistence, and save/load.
 - `test_enemy_combat_controller.gd` covers the three distinct movement profiles and recovery windows.
 - The focused CI workflow now runs both tests. Runtime status remains for the developer to verify.
+
+
+### Combat feedback pass
+
+- Successful melee, firearm, body-shot, and counter hits now create short floating damage callouts and a hit flash on the target.
+- Player damage creates a red health-loss callout and a brief damage flash, layered with the existing dodge/invulnerability blink.
+- Enemy telegraphs pulse while active and use distinct colors for the pressure fighter, counter guard, and skirmisher.
+- The feedback is intentionally lightweight and procedural until the project has final sprite animation, audio, and hit-stop assets.
