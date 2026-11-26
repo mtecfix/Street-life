@@ -8,6 +8,10 @@ const ITEM_DEFINITIONS := {
     "medkit": {"name": "First-aid kit", "price": 18, "heal": 45, "description": "Restores 45 health."},
     "soda": {"name": "Energy soda", "price": 8, "heal": 5, "description": "A small pick-me-up. Restores 5 health."}
 }
+const WEAPON_SHOP := {
+    "smg": {"name": "Compact SMG", "price": 180, "magazine": 24, "reserve": 96},
+    "carbine": {"name": "Street Carbine", "price": 320, "magazine": 20, "reserve": 80}
+}
 
 var player_cash: int = 25
 var player_health: int = 100
@@ -26,6 +30,13 @@ var mission_outcome: String = ""
 var current_encounter_id: String = "corner_brawler"
 var last_combat_won: bool = false
 var inventory: Dictionary = {}
+var owned_weapons: Array = ["sidearm"]
+var equipped_weapon_id: String = "sidearm"
+var weapon_ammo: Dictionary = {
+    "sidearm": {"magazine": 12, "reserve": 48},
+    "smg": {"magazine": 24, "reserve": 96},
+    "carbine": {"magazine": 20, "reserve": 80}
+}
 var reputation: Dictionary = {"locals": 0, "rivals": 0}
 var npc_relationships: Dictionary = {}
 var world_flags: Dictionary = {}
@@ -68,6 +79,44 @@ func purchase_item(item_id: String) -> bool:
         return false
     player_cash -= price
     return add_item(item_id, 1)
+
+func purchase_weapon(weapon_id: String) -> bool:
+    if not WEAPON_SHOP.has(weapon_id) or weapon_id in owned_weapons:
+        return false
+    var weapon: Dictionary = WEAPON_SHOP[weapon_id]
+    var price := int(weapon["price"])
+    if player_cash < price:
+        return false
+    player_cash -= price
+    owned_weapons.append(weapon_id)
+    weapon_ammo[weapon_id] = {"magazine": int(weapon["magazine"]), "reserve": int(weapon["reserve"])}
+    EventBus.inventory_changed.emit("weapon:" + weapon_id, 1)
+    SaveManager.save_game()
+    return true
+
+func equip_weapon(weapon_id: String) -> bool:
+    if weapon_id != "sidearm" and not WEAPON_SHOP.has(weapon_id):
+        return false
+    if weapon_id not in owned_weapons:
+        return false
+    equipped_weapon_id = weapon_id
+    SaveManager.save_game()
+    return true
+
+func set_weapon_ammo(weapon_id: String, magazine: int, reserve: int) -> void:
+    if weapon_id not in owned_weapons:
+        return
+    var profile := FirearmCombatController.get_profile(weapon_id)
+    weapon_ammo[weapon_id] = {
+        "magazine": clampi(magazine, 0, int(profile["magazine"])),
+        "reserve": maxi(0, reserve)
+    }
+
+func get_weapon_ammo(weapon_id: String) -> Dictionary:
+    var profile := FirearmCombatController.get_profile(weapon_id)
+    var defaults := {"magazine": int(profile["magazine"]), "reserve": int(profile["reserve_start"])}
+    var saved: Variant = weapon_ammo.get(weapon_id, defaults)
+    return saved.duplicate(true) if saved is Dictionary else defaults
 
 func use_item(item_id: String) -> bool:
     if not ITEM_DEFINITIONS.has(item_id):
