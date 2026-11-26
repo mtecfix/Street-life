@@ -126,3 +126,47 @@ func get_dodge_cost() -> float:
 
 func get_player_speed() -> float:
     return 225.0 + float(skill_levels.get("footwork", 0)) * 12.0
+
+
+# Separate combat disciplines share the level-up skill-point pool but retain
+# independent unlocks, so a melee build never has to purchase firearm upgrades.
+var combat_skill_unlocks: Dictionary = {"melee": [], "firearms": []}
+
+func purchase_combat_skill(style: String, node_id: String) -> bool:
+    var tree: Dictionary = CombatSkillTrees.get_tree(style)
+    if tree.is_empty():
+        return false
+    var unlocked: Array = combat_skill_unlocks.get(style, [])
+    if not CombatSkillTrees.can_purchase(style, node_id, unlocked, skill_points):
+        return false
+    var node: Dictionary = tree.get("nodes", {}).get(node_id, {})
+    var cost := int(node.get("cost", 0))
+    if cost <= 0 or skill_points < cost:
+        return false
+    unlocked = unlocked.duplicate()
+    unlocked.append(node_id)
+    combat_skill_unlocks[style] = unlocked
+    skill_points -= cost
+    EventBus.progression_changed.emit(player_level, player_xp, skill_points)
+    SaveManager.save_game()
+    return true
+
+func has_combat_skill(style: String, node_id: String) -> bool:
+    var unlocked: Array = combat_skill_unlocks.get(style, [])
+    return node_id in unlocked
+
+func respec_combat_skills(style: String = "") -> int:
+    var refunded := 0
+    var styles := [style] if style in ["melee", "firearms"] else ["melee", "firearms"]
+    for discipline in styles:
+        var tree: Dictionary = CombatSkillTrees.get_tree(discipline)
+        var nodes: Dictionary = tree.get("nodes", {})
+        var unlocked: Array = combat_skill_unlocks.get(discipline, [])
+        for node_id in unlocked:
+            refunded += int(nodes.get(node_id, {}).get("cost", 0))
+        combat_skill_unlocks[discipline] = []
+    if refunded > 0:
+        skill_points += refunded
+        EventBus.progression_changed.emit(player_level, player_xp, skill_points)
+        SaveManager.save_game()
+    return refunded
