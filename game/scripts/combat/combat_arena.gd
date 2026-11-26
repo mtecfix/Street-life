@@ -16,6 +16,7 @@ var enemy_damage := 18.0
 var enemy_windup := 0.78
 var enemy_name := "Corner challenger"
 var enemy_archetype_id := "pressure_brawler"
+var enemy_faction_id := "corner_set"
 var enemy_color := Color("#d66a55")
 var enemy_health := 100.0
 var encounter_reward := 50
@@ -160,7 +161,8 @@ func _ready() -> void:
     add_child(stats)
 
     _add_bar("YOUR HEALTH", Vector2(24, 54), player_health, "player")
-    _add_bar(enemy_name.to_upper(), Vector2(24, 91), enemy_health, "enemy")
+    var faction_name := str(EnemyCombatController.get_faction_profile(enemy_faction_id)["name"]).to_upper()
+    _add_bar("%s / %s" % [faction_name, enemy_name.to_upper()], Vector2(24, 91), enemy_health, "enemy")
     _add_bar("STAMINA", Vector2(24, 128), stamina, "stamina")
 
     var heading := Label.new()
@@ -173,7 +175,8 @@ func _ready() -> void:
     status.position = Vector2(24, 490)
     status.add_theme_font_size_override("font_size", 16)
     add_child(status)
-    _set_status("Face %s. TAB switches combat style; train in the neighborhood with K." % enemy_name)
+    var faction_profile := EnemyCombatController.get_faction_profile(enemy_faction_id)
+    _set_status("Face %s of %s. %s. TAB switches combat style; train with K." % [enemy_name, str(faction_profile["name"]), str(faction_profile["callout"])])
     _refresh()
 
 func _configure_encounter() -> void:
@@ -208,6 +211,18 @@ func _configure_encounter() -> void:
             enemy_windup = 0.78
             enemy_color = Color("#d66a55")
             encounter_reward = 50
+
+    enemy_faction_id = EnemyCombatController.get_faction_id_for_encounter(GameState.current_encounter_id)
+    var faction_profile := EnemyCombatController.get_faction_profile(enemy_faction_id)
+    var faction_stats := EnemyCombatController.get_faction_adjusted_stats(enemy_faction_id, {
+        "speed": enemy_speed,
+        "damage": enemy_damage,
+        "windup": enemy_windup
+    })
+    enemy_speed = float(faction_stats["speed"])
+    enemy_damage = float(faction_stats["damage"])
+    enemy_windup = float(faction_stats["windup"])
+    enemy_color = faction_profile["color"]
 
 func _process(delta: float) -> void:
     if finished:
@@ -419,7 +434,7 @@ func _dodge() -> void:
 func _resolve_enemy_attack() -> void:
     telegraph_timer = -1.0
     telegraph.visible = false
-    enemy_recovery = EnemyCombatController.get_recovery_duration(enemy_archetype_id)
+    enemy_recovery = EnemyCombatController.get_faction_recovery_duration(enemy_archetype_id, enemy_faction_id)
     var enemy_direction := (enemy.position - player.position).normalized()
     if guard_timer > 0.0 and combat_style == "melee" and facing_direction.dot(enemy_direction) > 0.35:
         guard_timer = 0.0
