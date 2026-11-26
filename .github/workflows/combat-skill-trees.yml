@@ -12,6 +12,10 @@ on:
       - "game/**"
       - ".github/workflows/combat-skill-trees.yml"
 
+concurrency:
+  group: combat-skill-tree-validation-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
