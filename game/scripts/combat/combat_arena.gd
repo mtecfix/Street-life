@@ -28,6 +28,9 @@ var combo_window_timer := 0.0
 var melee_buffer_timer := 0.0
 var buffered_heavy_attack := false
 var enemy_recovery := 0.0
+var enemy_flash_timer := 0.0
+var player_flash_timer := 0.0
+var combat_popups: Array[Dictionary] = []
 var telegraph_timer := -1.0
 var dodge_timer := 0.0
 var invulnerability_timer := 0.0
@@ -137,6 +140,10 @@ func _ready() -> void:
     telegraph = Polygon2D.new()
     telegraph.polygon = _make_circle(54.0, 40)
     telegraph.color = Color(0.95, 0.22, 0.18, 0.25)
+    if enemy_archetype_id == "counter_guard":
+        telegraph.color = Color(0.98, 0.62, 0.20, 0.30)
+    elif enemy_archetype_id == "skirmisher":
+        telegraph.color = Color(0.72, 0.40, 0.96, 0.30)
     telegraph.visible = false
     add_child(telegraph)
 
@@ -207,6 +214,11 @@ func _process(delta: float) -> void:
         return
 
     attack_cooldown = maxf(0.0, attack_cooldown - delta)
+    enemy_flash_timer = maxf(0.0, enemy_flash_timer - delta)
+    player_flash_timer = maxf(0.0, player_flash_timer - delta)
+    _update_combat_popups(delta)
+    if enemy_flash_timer <= 0.0 and is_instance_valid(enemy):
+        enemy.modulate = Color.WHITE
     guard_timer = maxf(0.0, guard_timer - delta)
     last_shot_timer = maxf(0.0, last_shot_timer - delta)
     var recovery_rate := 1.15 if GameState.has_combat_skill("firearms", "composure") else 1.0
@@ -273,6 +285,8 @@ func _process(delta: float) -> void:
         telegraph_timer -= delta
         telegraph.position = enemy.position
         telegraph.visible = true
+        var pulse := 1.0 + 0.08 * sin(Time.get_ticks_msec() / 70.0)
+        telegraph.scale = Vector2.ONE * pulse
         if telegraph_timer <= 0.0:
             _resolve_enemy_attack()
     elif enemy_recovery <= 0.0 and distance <= enemy_attack_range:
@@ -283,7 +297,8 @@ func _process(delta: float) -> void:
     else:
         telegraph.visible = false
 
-    player.modulate = Color(1.0, 1.0, 1.0, 0.45 if invulnerability_timer > 0.0 and int(Time.get_ticks_msec() / 80) % 2 == 0 else 1.0)
+    var player_alpha := 0.45 if invulnerability_timer > 0.0 and int(Time.get_ticks_msec() / 80) % 2 == 0 else 1.0
+    player.modulate = Color("#ff8b82", player_alpha) if player_flash_timer > 0.0 else Color(1.0, 1.0, 1.0, player_alpha)
     _refresh()
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -337,8 +352,7 @@ func _attack() -> void:
     attack_cooldown = 0.42
     combo_step = (combo_step + 1) % 3
     combo_window_timer = 0.85 * (1.15 if GameState.has_combat_skill("melee", "combination_flow") else 1.0)
-    enemy_health = maxf(0.0, enemy_health - damage)
-    enemy.modulate = Color("#ffffff")
+    _apply_enemy_damage(float(damage), "COMBO")
     if enemy_health <= 0.0:
         _win_encounter()
     else:
@@ -357,8 +371,7 @@ func _heavy_attack() -> void:
     combo_step = 0
     combo_window_timer = 0.0
     var damage := MeleeCombatController.heavy_damage(GameState.get_attack_damage(), GameState.combat_skill_unlocks.get("melee", []))
-    enemy_health = maxf(0.0, enemy_health - damage)
-    enemy.modulate = Color("#ffffff")
+    _apply_enemy_damage(float(damage), "HEAVY")
 
     var interrupted := telegraph_timer >= 0.0
     if interrupted:
@@ -410,7 +423,7 @@ func _resolve_enemy_attack() -> void:
         guard_timer = 0.0
         if GameState.has_combat_skill("melee", "counter_window"):
             var counter_damage := MeleeCombatController.counter_damage(GameState.combat_skill_unlocks.get("melee", []))
-            enemy_health = maxf(0.0, enemy_health - counter_damage)
+            _apply_enemy_damage(counter_damage, "COUNTER")
             _set_status("PERFECT BLOCK — counter for %d damage!" % roundi(counter_damage))
             if enemy_health <= 0.0:
                 _win_encounter()
@@ -418,6 +431,8 @@ func _resolve_enemy_attack() -> void:
             _set_status("BLOCKED! You absorbed the incoming strike.")
     elif player.position.distance_to(enemy.position) <= enemy_attack_range + 20.0 and invulnerability_timer <= 0.0:
         player_health = maxf(0.0, player_health - enemy_damage)
+        player_flash_timer = 0.22
+        _spawn_combat_popup("-%d HP" % roundi(enemy_damage), player.position + Vector2(-10, -30), Color("#ffaaa1"))
         aim_recovery_timer = 2.0
         GameState.player_health = int(player_health)
         _set_status("You took a hit. Use SHIFT to dodge the next warning.")
@@ -561,8 +576,7 @@ func _firearm_attack() -> void:
     var damage := FirearmCombatController.get_shot_damage(active_weapon_id, aim_ready, moving, unlocked_firearms, last_shot_timer > 0.0, ammo_in_magazine)
     attack_cooldown = FirearmCombatController.get_shot_cooldown(active_weapon_id, unlocked_firearms)
     last_shot_timer = 0.72
-    enemy_health = maxf(0.0, enemy_health - damage)
-    enemy.modulate = Color("#fff2c9")
+    _apply_enemy_damage(damage, "SHOT")
     if enemy_health <= 0.0:
         _win_encounter()
     else:
@@ -642,6 +656,43 @@ func _segments_intersect(a: Vector2, b: Vector2, c: Vector2, d: Vector2) -> bool
     var u := (c - a).cross(ab) / denominator
     return t >= 0.0 and t <= 1.0 and u >= 0.0 and u <= 1.0
 
+
+func _apply_enemy_damage(amount: float, hit_label: String) -> void:
+    enemy_health = maxf(0.0, enemy_health - amount)
+    enemy_flash_timer = 0.16
+    if is_instance_valid(enemy):
+        enemy.modulate = Color("#fff0bd")
+        _spawn_combat_popup("%s  -%d" % [hit_label, roundi(amount)], enemy.position + Vector2(-28, -34), Color("#ffe2a3"))
+
+func _spawn_combat_popup(message: String, popup_position: Vector2, tint: Color) -> void:
+    var popup := Label.new()
+    popup.text = message
+    popup.position = popup_position
+    popup.add_theme_font_size_override("font_size", 15)
+    popup.add_theme_color_override("font_color", tint)
+    popup.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+    popup.add_theme_constant_override("shadow_offset_x", 1)
+    popup.add_theme_constant_override("shadow_offset_y", 2)
+    popup.z_index = 20
+    add_child(popup)
+    combat_popups.append({"node": popup, "time": 0.72})
+
+func _update_combat_popups(delta: float) -> void:
+    for index in range(combat_popups.size() - 1, -1, -1):
+        var popup_data: Dictionary = combat_popups[index]
+        var remaining := float(popup_data["time"]) - delta
+        var popup: Label = popup_data["node"]
+        if remaining <= 0.0 or not is_instance_valid(popup):
+            if is_instance_valid(popup):
+                popup.queue_free()
+            combat_popups.remove_at(index)
+            continue
+        popup_data["time"] = remaining
+        popup.position += Vector2(0, -34.0 * delta)
+        popup.modulate.a = clampf(remaining / 0.72, 0.0, 1.0)
+        combat_popups[index] = popup_data
+
+
 func _body_shot() -> void:
     if finished or not GameState.has_combat_skill("melee", "body_shot"):
         _set_status("Body Shot is locked. Unlock it in Combat Training (K).")
@@ -656,7 +707,7 @@ func _body_shot() -> void:
     attack_cooldown = 0.72
     combo_step = 0
     var interrupted := telegraph_timer >= 0.0
-    enemy_health = maxf(0.0, enemy_health - 34.0)
+    _apply_enemy_damage(34.0, "BODY SHOT")
     if interrupted:
         telegraph_timer = -1.0
         telegraph.visible = false
