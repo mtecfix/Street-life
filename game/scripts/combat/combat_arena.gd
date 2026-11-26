@@ -151,7 +151,7 @@ func _ready() -> void:
 
     var heading := Label.new()
     heading.position = Vector2(24, 166)
-    heading.text = "%s  |  TAB: STYLE   A: AIM   F: FIRE   R: RELOAD / BODY SHOT   SPACE: COMBO   Q: HEAVY   C: GUARD   SHIFT: DODGE   ESC: RETREAT" % _environment_label()
+    heading.text = "%s  |  TAB: STYLE   Z: AIM   F: FIRE   R: RELOAD / BODY SHOT   SPACE: COMBO   Q: HEAVY   C: GUARD   SHIFT: DODGE   ESC: RETREAT" % _environment_label()
     heading.add_theme_color_override("font_color", Color("#d6dce7"))
     add_child(heading)
 
@@ -267,7 +267,7 @@ func _unhandled_input(event: InputEvent) -> void:
     elif event is InputEventKey and event.pressed and not event.echo:
         if event.keycode == KEY_TAB:
             _toggle_combat_style()
-        elif event.keycode == KEY_A:
+        elif event.keycode == KEY_Z:
             _toggle_aim()
         elif event.keycode == KEY_F:
             if combat_style == "firearms":
