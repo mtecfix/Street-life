@@ -149,7 +149,7 @@ func _ready() -> void:
     status.position = Vector2(24, 490)
     status.add_theme_font_size_override("font_size", 16)
     add_child(status)
-    _set_status("Face %s. TAB switches combat style; K opens training." % enemy_name)
+    _set_status("Face %s. TAB switches combat style; train in the neighborhood with K." % enemy_name)
     _refresh()
 
 func _configure_encounter() -> void:
@@ -204,7 +204,10 @@ func _process(delta: float) -> void:
         combo_step = 0
     enemy_recovery = maxf(0.0, enemy_recovery - delta)
     invulnerability_timer = maxf(0.0, invulnerability_timer - delta)
-    stamina = minf(stamina_max, stamina + GameState.get_stamina_regen() * delta)
+    var stamina_regen := GameState.get_stamina_regen()
+    if combat_style == "melee" and GameState.has_combat_skill("melee", "pressure_fighter") and attack_cooldown > 0.0:
+        stamina_regen *= 0.75
+    stamina = minf(stamina_max, stamina + stamina_regen * delta)
 
     if dodge_timer > 0.0:
         dodge_timer = maxf(0.0, dodge_timer - delta)
@@ -302,6 +305,8 @@ func _heavy_attack() -> void:
     combo_step = 0
     combo_window_timer = 0.0
     var damage := get_heavy_attack_damage(GameState.get_attack_damage())
+    if GameState.has_combat_skill("melee", "counter_specialist"):
+        damage = roundi(float(damage) * 0.90)
     enemy_health = maxf(0.0, enemy_health - damage)
     enemy.modulate = Color("#ffffff")
 
