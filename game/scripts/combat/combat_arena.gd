@@ -226,6 +226,8 @@ func _process(delta: float) -> void:
     else:
         var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down")
         var move_speed := GameState.get_player_speed()
+        if combat_style == "firearms" and aiming and GameState.has_combat_skill("firearms", "precision_specialist"):
+            move_speed *= 0.90
         if combat_style == "firearms" and GameState.has_combat_skill("firearms", "mobile_operator"):
             move_speed *= 1.08
         player.position += direction * move_speed * delta
