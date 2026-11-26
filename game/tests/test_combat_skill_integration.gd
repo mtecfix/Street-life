@@ -8,6 +8,11 @@ func _initialize() -> void:
     call_deferred("_run_tests")
 
 func _run_tests() -> void:
+    var state: Variant = root.get_node_or_null("GameState")
+    if state == null:
+        push_error("Combat integration test could not find GameState.")
+        quit(1)
+        return
     var packed := load("res://scenes/combat/CombatArena.tscn") as PackedScene
     if packed == null:
         push_error("Combat arena scene failed to load.")
@@ -33,7 +38,7 @@ func _run_tests() -> void:
     arena._process(0.02)
     _check(arena.ammo_in_magazine == 5 and arena.reserve_ammo == 0, "Reload should transfer only available reserve ammunition.")
 
-    GameState.combat_skill_unlocks = {"melee": ["guard_up", "counter_window", "body_shot"], "firearms": []}
+    state.combat_skill_unlocks = {"melee": ["guard_up", "counter_window", "body_shot"], "firearms": []}
     arena.combat_style = "melee"
     arena.player.position = Vector2(250, 270)
     arena.enemy.position = Vector2(300, 270)
