@@ -54,14 +54,16 @@
 6. Verify purchased weapons and ammo persist after closing/reopening the game; confirm G cycles only owned firearms and interrupted reloads do not transfer ammo.
 7. Verify the melee input buffer only queues one action and cannot trigger after encounter completion.
 8. Play each encounter in both styles and check health, rewards, XP, mission flags, and return-to-neighborhood behavior.
-9. Test mouse/controller accessibility and remappable controls as a follow-up.
+9. Verify pressure/counter/skirmisher movement patterns, telegraph colors, damage callouts, and hit flashes feel readable.
+10. Test mouse/controller accessibility and remappable controls as a follow-up.
+10. Test mouse/controller accessibility and remappable controls as a follow-up.
 
 ## Known intentional prototype limits
 
 - Combat actors remain polygon placeholders; animation, sound, recoil, hit-stop, and projectile visuals are not included.
 - Firearm hits are deterministic range/line-of-sight resolutions, not simulated projectiles.
 - Cover geometry is a small set of arena rectangles, not a full physics/collision cover system.
-- Three melee enemy archetypes now have distinct movement/recovery: pressure fighter, counter guard, and skirmisher. Enemy firearm behavior is not included.
+- Three enemy archetypes have distinct movement and recovery: pressure fighter, counter guard, and skirmisher. Their telegraphs use different colors and pulse; hit/damage feedback uses floating callouts and short flashes. Enemy firearm behavior is not included.
 - Melee and firearm controllers are reusable rules modules, while the current arena script still coordinates input, actors, encounter state, and presentation.
 
 Please treat this as a feature branch requiring normal code review and runtime validation before merge.
@@ -73,3 +75,8 @@ Please treat this as a feature branch requiring normal code review and runtime v
 - Save format is now **v7** and persists ownership, equipped weapon, and per-weapon magazine/reserve ammo. Older v1–v6 saves migrate with only the starter sidearm.
 - Enemy behavior is no longer one generic chase loop: the corner challenger pressures directly, the shopfront guard holds distance and punishes mistakes, and the alley runner circles and repositions.
 - New test scripts cover weapon inventory persistence and enemy archetype movement. The CI workflow includes both.
+
+
+### Combat presentation update
+
+Successful player hits now show floating damage labels and brief target flashes. Incoming damage displays a red health-loss callout and player flash. Telegraph rings pulse and are color-coded by enemy archetype. These are procedural placeholder effects; final sprite animation, sound design, recoil, and hit-stop remain follow-up work.
