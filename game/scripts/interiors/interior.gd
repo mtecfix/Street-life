@@ -56,6 +56,10 @@ func _unhandled_input(event: InputEvent) -> void:
                 _purchase("medkit")
             KEY_3:
                 _purchase("soda")
+            KEY_4:
+                _purchase_weapon("smg")
+            KEY_5:
+                _purchase_weapon("carbine")
     elif event.keycode == KEY_E:
         if player and player.position.distance_to(BED_POSITION) <= 110.0:
             GameState.player_health = 100
@@ -79,12 +83,29 @@ func _purchase(item_id: String) -> void:
     else:
         status_label.text = "Can't buy that. Check your cash and bag capacity."
 
+func _purchase_weapon(weapon_id: String) -> void:
+    if weapon_id in GameState.owned_weapons:
+        GameState.equip_weapon(weapon_id)
+        var profile := FirearmCombatController.get_profile(weapon_id)
+        status_label.text = "%s is already yours. Equipped for your next encounter." % str(profile["name"])
+        return
+    if GameState.purchase_weapon(weapon_id):
+        var profile := FirearmCombatController.get_profile(weapon_id)
+        status_label.text = "Purchased %s. It is now in your permanent loadout." % str(profile["name"])
+    else:
+        var offer: Dictionary = GameState.WEAPON_SHOP.get(weapon_id, {})
+        status_label.text = "Cannot purchase %s. You need $%d and it is not already owned." % [str(offer.get("name", weapon_id)), int(offer.get("price", 0))]
+    SaveManager.save_game()
+    _refresh_text()
+
 func _exit_interior() -> void:
     SceneManager.change_to("res://scenes/world/Neighborhood.tscn")
 
 func _refresh_text() -> void:
     if interior_kind == "shop":
-        detail_label.text = "1  SNACK  $5  (+15 HP)     2  FIRST-AID KIT  $18  (+45 HP)     3  SODA  $8  (+5 HP)     ESC: EXIT"
+        var smg_state := "OWNED" if "smg" in GameState.owned_weapons else "$180"
+        var carbine_state := "OWNED" if "carbine" in GameState.owned_weapons else "$320"
+        detail_label.text = "1 SNACK $5  |  2 FIRST-AID $18  |  3 SODA $8\n4 COMPACT SMG %s  |  5 STREET CARBINE %s  |  ESC: EXIT" % [smg_state, carbine_state]
     else:
         detail_label.text = "Move to the bed and press E to rest for eight hours. Health is fully restored. Move to the bottom door and press E to leave."
 
