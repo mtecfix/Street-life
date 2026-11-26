@@ -16,7 +16,7 @@ An original 2D urban action-adventure game built with Godot 4.x and targeted at 
 The first implementation sprint provides:
 - A Godot project with a main scene and explorable test block.
 - Keyboard movement and collision.
-- Separate combat arenas with fist-fighting and firearm systems, persistent weapon ownership, and distinct pressure-fighter, counter-guard, and skirmisher enemy behaviors.
+- Separate combat arenas with fist-fighting and firearm systems, persistent weapon ownership, and distinct pressure-fighter, counter-guard, and skirmisher enemy behaviors, with faction-specific crew identities and combat modifiers.
 - Scene transitions through an autoloaded scene manager.
 - Local save/load scaffolding.
 - Global game state, world clock, and event bus.
