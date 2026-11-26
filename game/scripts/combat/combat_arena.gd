@@ -293,7 +293,8 @@ func _process(delta: float) -> void:
         telegraph_timer = enemy_windup
         telegraph.position = enemy.position
         telegraph.visible = true
-        _set_status("%s winding up — DODGE NOW!" % enemy_name)
+        var archetype_profile := EnemyCombatController.get_profile(enemy_archetype_id)
+        _set_status("%s — %s winding up. DODGE OR BLOCK!" % [str(archetype_profile["display_name"]), enemy_name])
     else:
         telegraph.visible = false
 
