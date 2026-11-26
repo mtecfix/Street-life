@@ -17,6 +17,8 @@ var enemy_windup := 0.78
 var enemy_name := "Corner challenger"
 var enemy_archetype_id := "pressure_brawler"
 var enemy_faction_id := "corner_set"
+var encounter_waves: Array[Dictionary] = []
+var encounter_wave_index := 0
 var enemy_color := Color("#d66a55")
 var enemy_health := 100.0
 var encounter_reward := 50
@@ -59,6 +61,7 @@ var stats: Label
 var status: Label
 var player_hp_bar: ProgressBar
 var enemy_hp_bar: ProgressBar
+var enemy_name_label: Label
 var stamina_bar: ProgressBar
 
 func _draw() -> void:
@@ -140,11 +143,7 @@ func _ready() -> void:
 
     telegraph = Polygon2D.new()
     telegraph.polygon = _make_circle(54.0, 40)
-    telegraph.color = Color(0.95, 0.22, 0.18, 0.25)
-    if enemy_archetype_id == "counter_guard":
-        telegraph.color = Color(0.98, 0.62, 0.20, 0.30)
-    elif enemy_archetype_id == "skirmisher":
-        telegraph.color = Color(0.72, 0.40, 0.96, 0.30)
+    telegraph.color = _telegraph_color_for_archetype(enemy_archetype_id)
     telegraph.visible = false
     add_child(telegraph)
 
@@ -162,7 +161,7 @@ func _ready() -> void:
 
     _add_bar("YOUR HEALTH", Vector2(24, 54), player_health, "player")
     var faction_name := str(EnemyCombatController.get_faction_profile(enemy_faction_id)["name"]).to_upper()
-    _add_bar("%s / %s" % [faction_name, enemy_name.to_upper()], Vector2(24, 91), enemy_health, "enemy")
+    _add_bar("%s / %s — WAVE %d/%d" % [faction_name, enemy_name.to_upper(), encounter_wave_index + 1, encounter_waves.size()], Vector2(24, 91), enemy_health, "enemy")
     _add_bar("STAMINA", Vector2(24, 128), stamina, "stamina")
 
     var heading := Label.new()
@@ -213,6 +212,20 @@ func _configure_encounter() -> void:
             encounter_reward = 50
 
     enemy_faction_id = EnemyCombatController.get_faction_id_for_encounter(GameState.current_encounter_id)
+    encounter_waves = EncounterWaveController.get_waves(GameState.current_encounter_id)
+    encounter_wave_index = 0
+    if not encounter_waves.is_empty():
+        _apply_wave_profile(encounter_waves[0])
+
+func _apply_wave_profile(wave: Dictionary) -> void:
+    enemy_name = str(wave.get("name", enemy_name))
+    enemy_archetype_id = str(wave.get("archetype", enemy_archetype_id))
+    enemy_faction_id = str(wave.get("faction", enemy_faction_id))
+    enemy_health = float(wave.get("health", enemy_health))
+    enemy_speed = float(wave.get("speed", enemy_speed))
+    enemy_attack_range = float(wave.get("attack_range", enemy_attack_range))
+    enemy_damage = float(wave.get("damage", enemy_damage))
+    enemy_windup = float(wave.get("windup", enemy_windup))
     var faction_profile := EnemyCombatController.get_faction_profile(enemy_faction_id)
     var faction_stats := EnemyCombatController.get_faction_adjusted_stats(enemy_faction_id, {
         "speed": enemy_speed,
@@ -223,6 +236,46 @@ func _configure_encounter() -> void:
     enemy_damage = float(faction_stats["damage"])
     enemy_windup = float(faction_stats["windup"])
     enemy_color = faction_profile["color"]
+
+func _advance_encounter_wave() -> bool:
+    var next_index := encounter_wave_index + 1
+    if next_index >= encounter_waves.size():
+        return false
+    encounter_wave_index = next_index
+    _apply_wave_profile(encounter_waves[encounter_wave_index])
+    enemy.position = Vector2(690, 270) if environment_kind != "alley" else Vector2(690, 270 + (encounter_wave_index % 2) * 80)
+    enemy.color = enemy_color
+    enemy.modulate = Color.WHITE
+    enemy_health = maxf(1.0, enemy_health)
+    enemy_flash_timer = 0.0
+    enemy_recovery = 0.55
+    telegraph_timer = -1.0
+    telegraph.visible = false
+    telegraph.color = _telegraph_color_for_archetype(enemy_archetype_id)
+    if enemy_hp_bar:
+        enemy_hp_bar.max_value = maxf(100.0, enemy_health)
+        enemy_hp_bar.value = enemy_health
+    if enemy_name_label:
+        var faction_name := str(EnemyCombatController.get_faction_profile(enemy_faction_id)["name"]).to_upper()
+        enemy_name_label.text = "%s / %s — WAVE %d/%d" % [faction_name, enemy_name.to_upper(), encounter_wave_index + 1, encounter_waves.size()]
+    _set_status("BACKUP ARRIVED — WAVE %d/%d: %s. Keep moving." % [encounter_wave_index + 1, encounter_waves.size(), enemy_name])
+    _refresh()
+    return true
+
+func _handle_enemy_defeated() -> void:
+    if finished:
+        return
+    if not _advance_encounter_wave():
+        _win_encounter()
+
+func _telegraph_color_for_archetype(archetype_id: String) -> Color:
+    match archetype_id:
+        "counter_guard":
+            return Color(0.98, 0.62, 0.20, 0.30)
+        "skirmisher":
+            return Color(0.72, 0.40, 0.96, 0.30)
+        _:
+            return Color(0.95, 0.22, 0.18, 0.25)
 
 func _process(delta: float) -> void:
     if finished:
@@ -513,6 +566,8 @@ func _add_bar(caption: String, bar_position: Vector2, initial_value: float, kind
     label.add_theme_font_size_override("font_size", 11)
     label.add_theme_color_override("font_color", Color("#b9c5d6"))
     add_child(label)
+    if kind == "enemy":
+        enemy_name_label = label
 
     var bar := ProgressBar.new()
     bar.position = bar_position + Vector2(110, 1)
