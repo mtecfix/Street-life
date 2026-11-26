@@ -159,3 +159,41 @@ Track:
 - Player-reported fun, frustration, and perceived fairness.
 
 Tune around player enjoyment and build variety, not maximum damage output.
+
+
+---
+
+## 11. Implemented prototype — November 26, 2026
+
+The first playable integration now builds on the design above. The current branch contains:
+
+- An in-game **Combat Training** panel opened with **K** from the neighborhood HUD, with separate Fist Fighting and Firearms tabs, point costs, prerequisite-aware locked/available/unlocked states, and a confirmation before respec.
+- Purchases, unlock IDs, and respec refunds owned by `GameState`; the existing level-up skill-point pool is shared, while each discipline has independent unlocks.
+- Save format version 6 stores the two unlock lists. Older v1–v5 saves remain loadable and simply start with empty combat trees.
+- A playable arena prototype with **TAB** switching between fist fighting and firearms. Firearms include aim mode (**Z**), firing (**F**), an on-screen aim line, magazine/reserve ammunition, reload timing (**R**), hit confirmation, and distinct handling bonuses. Melee includes the existing combo/heavy/dodge loop plus unlockable guard (**C**), body shot (**R**), counter, combo, and dodge-follow-up effects.
+- A focused Godot 4.3 GitHub Actions workflow and a regression test for purchases, prerequisites, independent trees, persistence, and respec.
+
+### Prototype boundaries
+
+This is a functional first pass, not the final combat presentation. The arena still uses its existing polygon actors and simplified enemy behavior. Firearms currently use deterministic in-range hit resolution rather than projectile physics or line-of-sight; cover is represented by an extended acquisition-range upgrade, not physical cover. Weapon-specific animations, audio, recoil, enemy firearm behavior, and a dedicated weapon inventory are not included. The two attack styles are currently routed through the existing arena script; extracting them into separate controller scripts is a follow-up architecture task.
+
+### Controls
+
+| Input | Action |
+|---|---|
+| WASD / arrows | Move |
+| TAB | Switch fist fighting / firearms |
+| SPACE | Melee combo |
+| Q | Heavy strike |
+| C | Guard (requires Guard Up) |
+| R | Body Shot (requires unlock) / reload |
+| SHIFT | Dodge |
+| Z | Aim toggle (firearms) |
+| F | Fire (firearms) |
+| K | Open/close Combat Training in the neighborhood |
+
+### Effect mapping
+
+All currently purchasable nodes have a gameplay effect in the prototype: melee upgrades change combo timing/output, dodge cost/follow-up, attack range, body-shot access, guard/counter behavior, or stamina recovery; firearm upgrades change aim stability, firing cadence, reload duration, threat warning time, moving-shot penalty, recovery after being hit, target range, movement, or mastery handling. Balance values are initial tuning values and should be revisited after playtests.
+
+The focused CI workflow is the authoritative next validation step. Do not mark the PR ready to merge until Godot 4.3 import and headless tests pass.
