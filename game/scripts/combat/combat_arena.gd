@@ -206,7 +206,8 @@ func _process(delta: float) -> void:
     attack_cooldown = maxf(0.0, attack_cooldown - delta)
     guard_timer = maxf(0.0, guard_timer - delta)
     last_shot_timer = maxf(0.0, last_shot_timer - delta)
-    aim_recovery_timer = maxf(0.0, aim_recovery_timer - delta)
+    var recovery_rate := 1.15 if GameState.has_combat_skill("firearms", "composure") else 1.0
+    aim_recovery_timer = maxf(0.0, aim_recovery_timer - delta * recovery_rate)
     aim_transition_timer = maxf(0.0, aim_transition_timer - delta)
     if reload_timer > 0.0:
         reload_timer -= delta
@@ -550,7 +551,7 @@ func _firearm_attack() -> void:
     var moving := Input.get_vector("move_left", "move_right", "move_up", "move_down") != Vector2.ZERO
     var aim_ready := aiming and aim_transition_timer <= 0.0
     var unlocked_firearms: Array = GameState.combat_skill_unlocks.get("firearms", [])
-    var damage := FirearmCombatController.get_shot_damage(active_weapon_id, aim_ready, moving, unlocked_firearms, last_shot_timer > 0.0, ammo_in_magazine, aim_recovery_timer > 0.0)
+    var damage := FirearmCombatController.get_shot_damage(active_weapon_id, aim_ready, moving, unlocked_firearms, last_shot_timer > 0.0, ammo_in_magazine)
     attack_cooldown = FirearmCombatController.get_shot_cooldown(active_weapon_id, unlocked_firearms)
     last_shot_timer = 0.72
     enemy_health = maxf(0.0, enemy_health - damage)
@@ -600,7 +601,9 @@ func _cover_rectangles() -> Array[Rect2]:
 
 func _has_clear_shot(from_point: Vector2, to_point: Vector2) -> bool:
     for obstacle in _cover_rectangles():
-        if obstacle.has_point(from_point) or obstacle.has_point(to_point):
+        if obstacle.has_point(to_point):
+            return false
+        if obstacle.has_point(from_point):
             continue
         var top_left := obstacle.position
         var top_right := Vector2(obstacle.end.x, obstacle.position.y)
