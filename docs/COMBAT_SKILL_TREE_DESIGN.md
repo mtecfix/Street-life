@@ -197,3 +197,19 @@ This is a functional first pass, not the final combat presentation. The arena st
 All currently purchasable nodes have a gameplay effect in the prototype: melee upgrades change combo timing/output, dodge cost/follow-up, attack range, body-shot access, guard/counter behavior, or stamina recovery; firearm upgrades change aim stability, firing cadence, reload duration, threat warning time, moving-shot penalty, recovery after being hit, target range, movement, or mastery handling. Balance values are initial tuning values and should be revisited after playtests.
 
 The focused CI workflow is the authoritative next validation step. Do not mark the PR ready to merge until Godot 4.3 import and headless tests pass.
+
+
+### Design research applied
+
+A second design pass used these principles to shape the playable implementation:
+
+- **Choices must be distinct, legible, balanced, and limited.** A node should communicate its real gameplay outcome, not hide behind vague stat labels. The shared point pool makes investment an opportunity-cost decision; independent trees preserve separate playstyle identity.
+- **Knowledge and execution must grow together.** A new defensive action such as guard/counter should be introduced with a readable threat window, then tested in encounters that reward timing rather than raw stats.
+- **Give the player an active defensive verb.** Guard and counter turn enemy windups into decisions instead of passive damage waiting; dodge remains a universal fallback.
+- **Favor meaningful mechanics over node count.** Numerical bonuses are kept modest and attached to a concrete action or tradeoff. Mastery nodes intentionally define a playstyle rather than simply being the largest damage upgrade.
+
+References:
+- [Upgrades, Equipment, and Skill Trees — Game Developer](https://www.gamedeveloper.com/design/upgrades-equipment-and-skill-trees)
+- [The Logic Behind Violence: A Primer on Combat System Design — Game Developer](https://www.gamedeveloper.com/design/the-logic-behind-violence-a-primer-on-combat-system-design)
+- [Godot 4.3: Saving games](https://docs.godotengine.org/en/4.3/tutorials/io/saving_games.html)
+- [Godot 4.3: Using CharacterBody2D](https://docs.godotengine.org/en/4.3/tutorials/physics/using_character_body_2d.html)
