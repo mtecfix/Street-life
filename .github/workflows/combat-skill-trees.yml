@@ -44,5 +44,7 @@ jobs:
         run: godot --headless --path game --script res://tests/test_enemy_factions.gd
       - name: Test encounter wave rosters
         run: godot --headless --path game --script res://tests/test_encounter_waves.gd
+      - name: Test gang combat coordination
+        run: godot --headless --path game --script res://tests/test_gang_combat_controller.gd
       - name: Test combat scenes
         run: godot --headless --path game --script res://tests/test_combat_scenes.gd
