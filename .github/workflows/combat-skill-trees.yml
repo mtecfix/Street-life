@@ -1,0 +1,50 @@
+name: Combat Skill Tree Validation
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "game/**"
+      - ".github/workflows/combat-skill-trees.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "game/**"
+      - ".github/workflows/combat-skill-trees.yml"
+
+concurrency:
+  group: combat-skill-tree-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate-combat-progression:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Import Godot project
+        run: godot --headless --path game --editor --quit
+      - name: Test progression and save migration
+        run: godot --headless --path game --script res://tests/test_progression.gd
+      - name: Test combat skill trees
+        run: godot --headless --path game --script res://tests/test_combat_skill_trees.gd
+      - name: Test combat rules
+        run: godot --headless --path game --script res://tests/test_combat_rules.gd
+      - name: Test combat skill integration
+        run: godot --headless --path game --script res://tests/test_combat_skill_integration.gd
+      - name: Test persistent weapon inventory
+        run: godot --headless --path game --script res://tests/test_weapon_inventory.gd
+      - name: Test enemy combat archetypes and factions
+        run: godot --headless --path game --script res://tests/test_enemy_combat_controller.gd
+      - name: Test enemy faction profiles
+        run: godot --headless --path game --script res://tests/test_enemy_factions.gd
+      - name: Test encounter wave rosters
+        run: godot --headless --path game --script res://tests/test_encounter_waves.gd
+      - name: Test gang combat coordination
+        run: godot --headless --path game --script res://tests/test_gang_combat_controller.gd
+      - name: Test combat scenes
+        run: godot --headless --path game --script res://tests/test_combat_scenes.gd

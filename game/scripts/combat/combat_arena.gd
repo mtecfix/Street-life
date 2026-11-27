@@ -15,6 +15,10 @@ var enemy_attack_range := 76.0
 var enemy_damage := 18.0
 var enemy_windup := 0.78
 var enemy_name := "Corner challenger"
+var enemy_archetype_id := "pressure_brawler"
+var enemy_faction_id := "corner_set"
+var encounter_waves: Array[Dictionary] = []
+var encounter_wave_index := 0
 var enemy_color := Color("#d66a55")
 var enemy_health := 100.0
 var encounter_reward := 50
@@ -24,12 +28,31 @@ var stamina_max := 100.0
 var attack_cooldown := 0.0
 var combo_step := 0
 var combo_window_timer := 0.0
+var melee_buffer_timer := 0.0
+var buffered_heavy_attack := false
 var enemy_recovery := 0.0
+var enemy_flash_timer := 0.0
+var player_flash_timer := 0.0
+var combat_popups: Array[Dictionary] = []
 var telegraph_timer := -1.0
 var dodge_timer := 0.0
 var invulnerability_timer := 0.0
 var dodge_direction := Vector2.ZERO
+var facing_direction := Vector2.RIGHT
 var finished := false
+var combat_style := "melee"
+var active_weapon_id := "sidearm"
+var ammo_in_magazine := 12
+var reserve_ammo := 48
+var reload_timer := 0.0
+var reload_duration := 1.45
+var guard_timer := 0.0
+var flank_followup_ready := false
+var last_shot_timer := 0.0
+var aim_recovery_timer := 0.0
+var aiming := false
+var aim_transition_timer := 0.0
+var aim_line: Line2D
 
 var player: Polygon2D
 var enemy: Polygon2D
@@ -38,6 +61,7 @@ var stats: Label
 var status: Label
 var player_hp_bar: ProgressBar
 var enemy_hp_bar: ProgressBar
+var enemy_name_label: Label
 var stamina_bar: ProgressBar
 
 func _draw() -> void:
@@ -98,6 +122,8 @@ func _environment_label() -> String:
 
 func _ready() -> void:
     _configure_encounter()
+    active_weapon_id = GameState.equipped_weapon_id
+    _sync_weapon_ammo()
     player_health = clampf(float(GameState.player_health), 1.0, 100.0)
     stamina_max = GameState.get_max_stamina()
     stamina = stamina_max
@@ -117,9 +143,16 @@ func _ready() -> void:
 
     telegraph = Polygon2D.new()
     telegraph.polygon = _make_circle(54.0, 40)
-    telegraph.color = Color(0.95, 0.22, 0.18, 0.25)
+    telegraph.color = _telegraph_color_for_archetype(enemy_archetype_id)
     telegraph.visible = false
     add_child(telegraph)
+
+    aim_line = Line2D.new()
+    aim_line.points = PackedVector2Array([Vector2.ZERO, Vector2(125, 0)])
+    aim_line.width = 2.0
+    aim_line.default_color = Color("#e6b56d", 0.72)
+    aim_line.visible = false
+    add_child(aim_line)
 
     stats = Label.new()
     stats.position = Vector2(24, 18)
@@ -127,12 +160,13 @@ func _ready() -> void:
     add_child(stats)
 
     _add_bar("YOUR HEALTH", Vector2(24, 54), player_health, "player")
-    _add_bar(enemy_name.to_upper(), Vector2(24, 91), enemy_health, "enemy")
+    var faction_name := str(EnemyCombatController.get_faction_profile(enemy_faction_id)["name"]).to_upper()
+    _add_bar("%s / %s — WAVE %d/%d" % [faction_name, enemy_name.to_upper(), encounter_wave_index + 1, encounter_waves.size()], Vector2(24, 91), enemy_health, "enemy")
     _add_bar("STAMINA", Vector2(24, 128), stamina, "stamina")
 
     var heading := Label.new()
     heading.position = Vector2(24, 166)
-    heading.text = "%s  |  WASD: MOVE   SPACE: COMBO   Q: HEAVY   SHIFT: DODGE   ESC: RETREAT" % _environment_label()
+    heading.text = "%s  |  TAB: STYLE   G: WEAPON   Z: AIM   F: FIRE   R: RELOAD / BODY SHOT   SPACE: COMBO   Q: HEAVY   C: GUARD   SHIFT: DODGE   ESC: RETREAT" % _environment_label()
     heading.add_theme_color_override("font_color", Color("#d6dce7"))
     add_child(heading)
 
@@ -140,30 +174,34 @@ func _ready() -> void:
     status.position = Vector2(24, 490)
     status.add_theme_font_size_override("font_size", 16)
     add_child(status)
-    _set_status("Face %s. Watch for the red attack warning." % enemy_name)
+    var faction_profile := EnemyCombatController.get_faction_profile(enemy_faction_id)
+    _set_status("Face %s of %s. %s. TAB switches combat style; train with K." % [enemy_name, str(faction_profile["name"]), str(faction_profile["callout"])])
     _refresh()
 
 func _configure_encounter() -> void:
     match GameState.current_encounter_id:
         "shop_guard":
+            enemy_archetype_id = "counter_guard"
             enemy_name = "Shopfront agitator"
             enemy_health = 82.0
-            enemy_speed = 118.0
-            enemy_attack_range = 70.0
-            enemy_damage = 14.0
-            enemy_windup = 0.64
+            enemy_speed = 82.0
+            enemy_attack_range = 128.0
+            enemy_damage = 20.0
+            enemy_windup = 1.02
             enemy_color = Color("#c58c4e")
             encounter_reward = 40
         "alley_ambush":
+            enemy_archetype_id = "skirmisher"
             enemy_name = "Alley runner"
             enemy_health = 125.0
-            enemy_speed = 138.0
-            enemy_attack_range = 82.0
-            enemy_damage = 22.0
+            enemy_speed = 128.0
+            enemy_attack_range = 142.0
+            enemy_damage = 14.0
             enemy_windup = 0.58
             enemy_color = Color("#9e6bb0")
             encounter_reward = 35
         _:
+            enemy_archetype_id = "pressure_brawler"
             enemy_name = "Corner challenger"
             enemy_health = 100.0
             enemy_speed = 92.0
@@ -173,83 +211,226 @@ func _configure_encounter() -> void:
             enemy_color = Color("#d66a55")
             encounter_reward = 50
 
+    enemy_faction_id = EnemyCombatController.get_faction_id_for_encounter(GameState.current_encounter_id)
+    encounter_waves = EncounterWaveController.get_waves(GameState.current_encounter_id)
+    encounter_wave_index = 0
+    if not encounter_waves.is_empty():
+        _apply_wave_profile(encounter_waves[0])
+
+func _apply_wave_profile(wave: Dictionary) -> void:
+    enemy_name = str(wave.get("name", enemy_name))
+    enemy_archetype_id = str(wave.get("archetype", enemy_archetype_id))
+    enemy_faction_id = str(wave.get("faction", enemy_faction_id))
+    enemy_health = float(wave.get("health", enemy_health))
+    enemy_speed = float(wave.get("speed", enemy_speed))
+    enemy_attack_range = float(wave.get("attack_range", enemy_attack_range))
+    enemy_damage = float(wave.get("damage", enemy_damage))
+    enemy_windup = float(wave.get("windup", enemy_windup))
+    var faction_profile := EnemyCombatController.get_faction_profile(enemy_faction_id)
+    var faction_stats := EnemyCombatController.get_faction_adjusted_stats(enemy_faction_id, {
+        "speed": enemy_speed,
+        "damage": enemy_damage,
+        "windup": enemy_windup
+    })
+    enemy_speed = float(faction_stats["speed"])
+    enemy_damage = float(faction_stats["damage"])
+    enemy_windup = float(faction_stats["windup"])
+    enemy_color = faction_profile["color"]
+
+func _advance_encounter_wave() -> bool:
+    var next_index := encounter_wave_index + 1
+    if next_index >= encounter_waves.size():
+        return false
+    encounter_wave_index = next_index
+    _apply_wave_profile(encounter_waves[encounter_wave_index])
+    enemy.position = Vector2(690, 270) if environment_kind != "alley" else Vector2(690, 270 + (encounter_wave_index % 2) * 80)
+    enemy.color = enemy_color
+    enemy.modulate = Color.WHITE
+    enemy_health = maxf(1.0, enemy_health)
+    enemy_flash_timer = 0.0
+    enemy_recovery = 0.55
+    telegraph_timer = -1.0
+    telegraph.visible = false
+    telegraph.color = _telegraph_color_for_archetype(enemy_archetype_id)
+    if enemy_hp_bar:
+        enemy_hp_bar.max_value = maxf(100.0, enemy_health)
+        enemy_hp_bar.value = enemy_health
+    if enemy_name_label:
+        var faction_name := str(EnemyCombatController.get_faction_profile(enemy_faction_id)["name"]).to_upper()
+        enemy_name_label.text = "%s / %s — WAVE %d/%d" % [faction_name, enemy_name.to_upper(), encounter_wave_index + 1, encounter_waves.size()]
+    _set_status("BACKUP ARRIVED — WAVE %d/%d: %s. Keep moving." % [encounter_wave_index + 1, encounter_waves.size(), enemy_name])
+    _refresh()
+    return true
+
+func _handle_enemy_defeated() -> void:
+    if finished:
+        return
+    if not _advance_encounter_wave():
+        _win_encounter()
+
+func _telegraph_color_for_archetype(archetype_id: String) -> Color:
+    match archetype_id:
+        "counter_guard":
+            return Color(0.98, 0.62, 0.20, 0.30)
+        "skirmisher":
+            return Color(0.72, 0.40, 0.96, 0.30)
+        _:
+            return Color(0.95, 0.22, 0.18, 0.25)
+
 func _process(delta: float) -> void:
     if finished:
+        _update_combat_popups(delta)
         return
 
     attack_cooldown = maxf(0.0, attack_cooldown - delta)
+    enemy_flash_timer = maxf(0.0, enemy_flash_timer - delta)
+    player_flash_timer = maxf(0.0, player_flash_timer - delta)
+    _update_combat_popups(delta)
+    if enemy_flash_timer <= 0.0 and is_instance_valid(enemy):
+        enemy.modulate = Color.WHITE
+    guard_timer = maxf(0.0, guard_timer - delta)
+    last_shot_timer = maxf(0.0, last_shot_timer - delta)
+    var recovery_rate := 1.15 if GameState.has_combat_skill("firearms", "composure") else 1.0
+    aim_recovery_timer = maxf(0.0, aim_recovery_timer - delta * recovery_rate)
+    aim_transition_timer = maxf(0.0, aim_transition_timer - delta)
+    if reload_timer > 0.0:
+        reload_timer -= delta
+        if reload_timer <= 0.0:
+            var magazine_capacity := int(FirearmCombatController.get_profile(active_weapon_id)["magazine"])
+            var loaded := mini(magazine_capacity - ammo_in_magazine, reserve_ammo)
+            ammo_in_magazine += loaded
+            reserve_ammo -= loaded
+            GameState.set_weapon_ammo(active_weapon_id, ammo_in_magazine, reserve_ammo)
+            SaveManager.save_game()
+            _set_status("Reload complete — %d / %d rounds." % [ammo_in_magazine, reserve_ammo])
     combo_window_timer = maxf(0.0, combo_window_timer - delta)
+    melee_buffer_timer = maxf(0.0, melee_buffer_timer - delta)
+    if melee_buffer_timer > 0.0 and attack_cooldown <= 0.0 and combat_style == "melee":
+        melee_buffer_timer = 0.0
+        if buffered_heavy_attack:
+            _heavy_attack()
+        else:
+            _attack()
+        buffered_heavy_attack = false
     if combo_window_timer <= 0.0:
         combo_step = 0
     enemy_recovery = maxf(0.0, enemy_recovery - delta)
     invulnerability_timer = maxf(0.0, invulnerability_timer - delta)
-    stamina = minf(stamina_max, stamina + GameState.get_stamina_regen() * delta)
+    var stamina_regen := GameState.get_stamina_regen()
+    if combat_style == "melee" and GameState.has_combat_skill("melee", "pressure_fighter") and attack_cooldown > 0.0:
+        stamina_regen *= 0.75
+    stamina = minf(stamina_max, stamina + stamina_regen * delta)
 
     if dodge_timer > 0.0:
         dodge_timer = maxf(0.0, dodge_timer - delta)
         player.position += dodge_direction * 510.0 * delta
     else:
         var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down")
-        player.position += direction * GameState.get_player_speed() * delta
+        if absf(direction.x) > 0.1:
+            facing_direction = Vector2.RIGHT if direction.x > 0.0 else Vector2.LEFT
+        var move_speed := GameState.get_player_speed()
+        if combat_style == "firearms" and aiming and GameState.has_combat_skill("firearms", "precision_specialist"):
+            move_speed *= 0.90
+        if combat_style == "firearms" and GameState.has_combat_skill("firearms", "mobile_operator"):
+            move_speed *= 1.08
+        player.position += direction * move_speed * delta
 
     var horizontal_margin := 210.0 if environment_kind == "alley" else 38.0
     player.position.x = clampf(player.position.x, horizontal_margin, ARENA_SIZE.x - horizontal_margin)
     player.position.y = clampf(player.position.y, 205.0, 445.0)
 
     var distance := enemy.position.distance_to(player.position)
-    if distance > 61.0:
-        enemy.position = enemy.position.move_toward(player.position, enemy_speed * delta)
+    if is_instance_valid(aim_line):
+        aim_line.visible = aiming and combat_style == "firearms"
+        aim_line.position = player.position
+        aim_line.rotation = (enemy.position - player.position).angle()
+    var enemy_movement := EnemyCombatController.get_movement_direction(enemy_archetype_id, player.position, enemy.position, Time.get_ticks_msec() / 1000.0)
+    if enemy_movement != Vector2.ZERO:
+        enemy.position += enemy_movement * enemy_speed * delta
+    enemy.position.x = clampf(enemy.position.x, 205.0, ARENA_SIZE.x - 205.0)
+    enemy.position.y = clampf(enemy.position.y, 205.0, 445.0)
 
     if telegraph_timer >= 0.0:
         telegraph_timer -= delta
         telegraph.position = enemy.position
         telegraph.visible = true
+        var pulse := 1.0 + 0.08 * sin(Time.get_ticks_msec() / 70.0)
+        telegraph.scale = Vector2.ONE * pulse
         if telegraph_timer <= 0.0:
             _resolve_enemy_attack()
     elif enemy_recovery <= 0.0 and distance <= enemy_attack_range:
         telegraph_timer = enemy_windup
         telegraph.position = enemy.position
         telegraph.visible = true
-        _set_status("%s winding up — DODGE NOW!" % enemy_name)
+        var archetype_profile := EnemyCombatController.get_profile(enemy_archetype_id)
+        _set_status("%s — %s winding up. DODGE OR BLOCK!" % [str(archetype_profile["display_name"]), enemy_name])
     else:
         telegraph.visible = false
 
-    player.modulate = Color(1.0, 1.0, 1.0, 0.45 if invulnerability_timer > 0.0 and int(Time.get_ticks_msec() / 80) % 2 == 0 else 1.0)
+    var player_alpha := 0.45 if invulnerability_timer > 0.0 and int(Time.get_ticks_msec() / 80) % 2 == 0 else 1.0
+    player.modulate = Color("#ff8b82", player_alpha) if player_flash_timer > 0.0 else Color(1.0, 1.0, 1.0, player_alpha)
     _refresh()
 
 func _unhandled_input(event: InputEvent) -> void:
     if event.is_action_pressed("ui_cancel"):
         _return_to_neighborhood()
     elif event is InputEventKey and event.pressed and not event.echo:
-        if event.keycode == KEY_SPACE:
-            _attack()
+        if event.keycode == KEY_TAB:
+            _toggle_combat_style()
+        elif event.keycode == KEY_Z:
+            _toggle_aim()
+        elif event.keycode == KEY_G:
+            if combat_style == "firearms":
+                _cycle_firearm()
+        elif event.keycode == KEY_F:
+            if combat_style == "firearms":
+                _firearm_attack()
+        elif event.keycode == KEY_R:
+            if combat_style == "firearms":
+                _reload_firearm()
+            else:
+                _body_shot()
+        elif event.keycode == KEY_C:
+            _guard()
+        elif event.keycode == KEY_SPACE:
+            if combat_style == "melee" and attack_cooldown > 0.0:
+                melee_buffer_timer = 0.16
+                buffered_heavy_attack = false
+            else:
+                _attack()
         elif event.keycode == KEY_Q:
-            _heavy_attack()
+            if combat_style == "melee" and attack_cooldown > 0.0:
+                melee_buffer_timer = 0.16
+                buffered_heavy_attack = true
+            else:
+                _heavy_attack()
         elif event.keycode == KEY_SHIFT:
             _dodge()
 
 func _attack() -> void:
-    if finished or attack_cooldown > 0.0 or stamina < ATTACK_COST:
+    if combat_style != "melee" or finished or attack_cooldown > 0.0 or stamina < ATTACK_COST:
         return
-    if player.position.distance_to(enemy.position) > PLAYER_ATTACK_RANGE:
+    var melee_range := PLAYER_ATTACK_RANGE + (10.0 if GameState.has_combat_skill("melee", "ring_control") else 0.0)
+    if player.position.distance_to(enemy.position) > melee_range:
         _set_status("Too far away. Move closer before attacking.")
         return
 
-    var damage := get_combo_damage(GameState.get_attack_damage(), combo_step)
+    var unlocked_melee: Array = GameState.combat_skill_unlocks.get("melee", [])
+    var damage := MeleeCombatController.combo_damage(GameState.get_attack_damage(), combo_step, unlocked_melee, flank_followup_ready)
+    flank_followup_ready = false
     stamina -= ATTACK_COST
     attack_cooldown = 0.42
     combo_step = (combo_step + 1) % 3
-    combo_window_timer = 0.85
-    enemy_health = maxf(0.0, enemy_health - damage)
-    enemy.modulate = Color("#ffffff")
+    combo_window_timer = 0.85 * (1.15 if GameState.has_combat_skill("melee", "combination_flow") else 1.0)
+    _apply_enemy_damage(float(damage), "COMBO")
     if enemy_health <= 0.0:
-        _win_encounter()
+        _handle_enemy_defeated()
     else:
         var combo_label := "3-HIT COMBO!" if combo_step == 0 else "COMBO %d/3" % combo_step
         _set_status("%s — %d damage. Press Q for a heavy strike." % [combo_label, damage])
 
 func _heavy_attack() -> void:
-    if finished or attack_cooldown > 0.0 or stamina < HEAVY_ATTACK_COST:
+    if combat_style != "melee" or finished or attack_cooldown > 0.0 or stamina < HEAVY_ATTACK_COST:
         return
     if player.position.distance_to(enemy.position) > PLAYER_ATTACK_RANGE:
         _set_status("Heavy strike out of range. Move closer.")
@@ -259,9 +440,8 @@ func _heavy_attack() -> void:
     attack_cooldown = 0.78
     combo_step = 0
     combo_window_timer = 0.0
-    var damage := get_heavy_attack_damage(GameState.get_attack_damage())
-    enemy_health = maxf(0.0, enemy_health - damage)
-    enemy.modulate = Color("#ffffff")
+    var damage := MeleeCombatController.heavy_damage(GameState.get_attack_damage(), GameState.combat_skill_unlocks.get("melee", []))
+    _apply_enemy_damage(float(damage), "HEAVY")
 
     var interrupted := telegraph_timer >= 0.0
     if interrupted:
@@ -270,7 +450,7 @@ func _heavy_attack() -> void:
         enemy_recovery = 0.85
 
     if enemy_health <= 0.0:
-        _win_encounter()
+        _handle_enemy_defeated()
     elif interrupted:
         _set_status("HEAVY HIT — %d damage. You interrupted the incoming strike!" % damage)
     else:
@@ -284,7 +464,11 @@ func get_heavy_attack_damage(base_damage: int) -> int:
     return roundi(float(base_damage) * 1.8)
 
 func _dodge() -> void:
-    if finished or dodge_timer > 0.0 or stamina < GameState.get_dodge_cost():
+    var melee_style := combat_style == "melee"
+    var melee_unlocks: Array = GameState.combat_skill_unlocks.get("melee", [])
+    var has_quick_step := melee_style and MeleeCombatController.has_node(melee_unlocks, "quick_step")
+    var dodge_cost := MeleeCombatController.dodge_cost(GameState.get_dodge_cost(), melee_unlocks) if melee_style else GameState.get_dodge_cost()
+    if finished or dodge_timer > 0.0 or stamina < dodge_cost:
         return
     var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down")
     if direction == Vector2.ZERO:
@@ -292,8 +476,10 @@ func _dodge() -> void:
     if direction == Vector2.ZERO:
         direction = Vector2.LEFT
     dodge_direction = direction.normalized()
-    stamina -= GameState.get_dodge_cost()
-    dodge_timer = 0.20
+    stamina -= dodge_cost
+    dodge_timer = MeleeCombatController.dodge_duration(melee_unlocks) if melee_style else 0.20
+    if melee_style and telegraph_timer >= 0.0 and (GameState.has_combat_skill("melee", "angle_change") or GameState.has_combat_skill("melee", "slip_and_return")):
+        flank_followup_ready = true
     invulnerability_timer = 0.42
     if telegraph_timer >= 0.0:
         _set_status("Dodge! Create space before the opponent's next move.")
@@ -301,9 +487,23 @@ func _dodge() -> void:
 func _resolve_enemy_attack() -> void:
     telegraph_timer = -1.0
     telegraph.visible = false
-    enemy_recovery = 1.05
-    if player.position.distance_to(enemy.position) <= enemy_attack_range + 20.0 and invulnerability_timer <= 0.0:
+    enemy_recovery = EnemyCombatController.get_faction_recovery_duration(enemy_archetype_id, enemy_faction_id)
+    var enemy_direction := (enemy.position - player.position).normalized()
+    if guard_timer > 0.0 and combat_style == "melee" and facing_direction.dot(enemy_direction) > 0.35:
+        guard_timer = 0.0
+        if GameState.has_combat_skill("melee", "counter_window"):
+            var counter_damage := MeleeCombatController.counter_damage(GameState.combat_skill_unlocks.get("melee", []))
+            _apply_enemy_damage(counter_damage, "COUNTER")
+            _set_status("PERFECT BLOCK — counter for %d damage!" % roundi(counter_damage))
+            if enemy_health <= 0.0:
+                _handle_enemy_defeated()
+        else:
+            _set_status("BLOCKED! You absorbed the incoming strike.")
+    elif player.position.distance_to(enemy.position) <= enemy_attack_range + 20.0 and invulnerability_timer <= 0.0:
         player_health = maxf(0.0, player_health - enemy_damage)
+        player_flash_timer = 0.22
+        _spawn_combat_popup("-%d HP" % roundi(enemy_damage), player.position + Vector2(-10, -30), Color("#ffaaa1"))
+        aim_recovery_timer = 2.0
         GameState.player_health = int(player_health)
         _set_status("You took a hit. Use SHIFT to dodge the next warning.")
         if player_health <= 0.0:
@@ -366,6 +566,8 @@ func _add_bar(caption: String, bar_position: Vector2, initial_value: float, kind
     label.add_theme_font_size_override("font_size", 11)
     label.add_theme_color_override("font_color", Color("#b9c5d6"))
     add_child(label)
+    if kind == "enemy":
+        enemy_name_label = label
 
     var bar := ProgressBar.new()
     bar.position = bar_position + Vector2(110, 1)
@@ -396,10 +598,214 @@ func _set_status(message: String) -> void:
 
 func _refresh() -> void:
     if stats:
-        stats.text = "CASH: $%d" % GameState.player_cash
+        if combat_style == "firearms":
+            var weapon_profile := FirearmCombatController.get_profile(active_weapon_id)
+            stats.text = "CASH: $%d   %s   %s   AMMO: %d / %d%s" % [GameState.player_cash, str(weapon_profile["name"]).to_upper(), "AIM" if aiming else "HIP", ammo_in_magazine, reserve_ammo, "   RELOADING" if reload_timer > 0.0 else ""]
+        else:
+            stats.text = "CASH: $%d   FIST FIGHTING   SP: %d" % [GameState.player_cash, GameState.skill_points]
     if player_hp_bar:
         player_hp_bar.value = player_health
     if enemy_hp_bar:
         enemy_hp_bar.value = enemy_health
     if stamina_bar:
         stamina_bar.value = stamina
+
+
+func _toggle_combat_style() -> void:
+    if finished:
+        return
+    combat_style = "firearms" if combat_style == "melee" else "melee"
+    if GameState.has_combat_skill("firearms", "combat_awareness"):
+        enemy_windup += 0.12 if combat_style == "firearms" else -0.12
+    if combat_style == "melee":
+        aiming = false
+    attack_cooldown = 0.05 if GameState.has_combat_skill("firearms", "reposition") else (0.18 if GameState.has_combat_skill("firearms", "snap_aim") else 0.28)
+    reload_timer = 0.0
+    _set_status("Combat style: %s. %s" % ["FIREARMS" if combat_style == "firearms" else "FIST FIGHTING", "G weapon, F fire, R reload, Z aim." if combat_style == "firearms" else "SPACE combo, Q heavy, C guard."])
+    _refresh()
+
+func _firearm_attack() -> void:
+    if finished or combat_style != "firearms" or attack_cooldown > 0.0 or reload_timer > 0.0:
+        return
+    if ammo_in_magazine <= 0:
+        _set_status("Magazine empty — press R to reload.")
+        return
+    var profile := FirearmCombatController.get_profile(active_weapon_id)
+    var distance := player.position.distance_to(enemy.position)
+    if not _has_clear_shot(player.position, enemy.position):
+        _set_status("LINE OF SIGHT BLOCKED — reposition around the obstacle.")
+        return
+    var effective_range := float(profile["range"]) + (60.0 if GameState.has_combat_skill("firearms", "cover_awareness") else 0.0)
+    if distance > effective_range:
+        _set_status("Target out of range for %s. Close the distance." % str(profile["name"]))
+        return
+    ammo_in_magazine -= 1
+    GameState.set_weapon_ammo(active_weapon_id, ammo_in_magazine, reserve_ammo)
+    SaveManager.save_game()
+    var moving := Input.get_vector("move_left", "move_right", "move_up", "move_down") != Vector2.ZERO
+    var aim_ready := aiming and aim_transition_timer <= 0.0
+    var unlocked_firearms: Array = GameState.combat_skill_unlocks.get("firearms", [])
+    var damage := FirearmCombatController.get_shot_damage(active_weapon_id, aim_ready, moving, unlocked_firearms, last_shot_timer > 0.0, ammo_in_magazine)
+    attack_cooldown = FirearmCombatController.get_shot_cooldown(active_weapon_id, unlocked_firearms)
+    last_shot_timer = 0.72
+    _apply_enemy_damage(damage, "SHOT")
+    if enemy_health <= 0.0:
+        _handle_enemy_defeated()
+    else:
+        _set_status("%s — HIT CONFIRMED: %d damage. %d rounds remain." % [str(profile["name"]), roundi(damage), ammo_in_magazine])
+    _refresh()
+
+func _reload_firearm() -> void:
+    if finished or combat_style != "firearms" or reload_timer > 0.0:
+        return
+    var profile := FirearmCombatController.get_profile(active_weapon_id)
+    if ammo_in_magazine >= int(profile["magazine"]) or reserve_ammo <= 0:
+        _set_status("Reload unavailable — magazine full or reserve empty.")
+        return
+    var duration := FirearmCombatController.get_reload_duration(active_weapon_id, ammo_in_magazine, GameState.combat_skill_unlocks.get("firearms", []))
+    reload_timer = duration
+    attack_cooldown = maxf(attack_cooldown, duration)
+    _set_status("Reloading %s — create space. %0.1f seconds." % [str(profile["name"]), duration])
+
+func _sync_weapon_ammo() -> void:
+    var ammo := GameState.get_weapon_ammo(active_weapon_id)
+    ammo_in_magazine = int(ammo.get("magazine", 0))
+    reserve_ammo = int(ammo.get("reserve", 0))
+
+func _cycle_firearm() -> void:
+    if finished or combat_style != "firearms" or reload_timer > 0.0:
+        return
+    var next_weapon := FirearmCombatController.next_owned_weapon(active_weapon_id, GameState.owned_weapons)
+    if next_weapon == active_weapon_id:
+        _set_status("No other firearms owned. Visit Maya's Market to purchase another weapon.")
+        return
+    active_weapon_id = next_weapon
+    GameState.equip_weapon(active_weapon_id)
+    _sync_weapon_ammo()
+    attack_cooldown = 0.22
+    aiming = false
+    var profile := FirearmCombatController.get_profile(active_weapon_id)
+    _set_status("Equipped %s — %s  [G: next weapon]" % [str(profile["name"]), str(profile["description"])])
+    _refresh()
+
+
+func _cover_rectangles() -> Array[Rect2]:
+    match environment_kind:
+        "shopfront":
+            return [Rect2(62, 214, 86, 72), Rect2(790, 330, 92, 58)]
+        "alley":
+            return [Rect2(34, 220, 126, 112), Rect2(806, 330, 112, 70)]
+        _:
+            return [Rect2(66, 292, 40, 66)]
+
+func _has_clear_shot(from_point: Vector2, to_point: Vector2) -> bool:
+    for obstacle in _cover_rectangles():
+        if obstacle.has_point(to_point):
+            return false
+        if obstacle.has_point(from_point):
+            continue
+        var top_left := obstacle.position
+        var top_right := Vector2(obstacle.end.x, obstacle.position.y)
+        var bottom_left := Vector2(obstacle.position.x, obstacle.end.y)
+        var bottom_right := obstacle.end
+        if _segments_intersect(from_point, to_point, top_left, top_right):
+            return false
+        if _segments_intersect(from_point, to_point, top_right, bottom_right):
+            return false
+        if _segments_intersect(from_point, to_point, bottom_right, bottom_left):
+            return false
+        if _segments_intersect(from_point, to_point, bottom_left, top_left):
+            return false
+    return true
+
+func _segments_intersect(a: Vector2, b: Vector2, c: Vector2, d: Vector2) -> bool:
+    var ab := b - a
+    var cd := d - c
+    var denominator := ab.cross(cd)
+    if absf(denominator) < 0.0001:
+        return false
+    var t := (c - a).cross(cd) / denominator
+    var u := (c - a).cross(ab) / denominator
+    return t >= 0.0 and t <= 1.0 and u >= 0.0 and u <= 1.0
+
+
+func _apply_enemy_damage(amount: float, hit_label: String) -> void:
+    enemy_health = maxf(0.0, enemy_health - amount)
+    enemy_flash_timer = 0.16
+    if is_instance_valid(enemy):
+        enemy.modulate = Color("#fff0bd")
+        _spawn_combat_popup("%s  -%d" % [hit_label, roundi(amount)], enemy.position + Vector2(-28, -34), Color("#ffe2a3"))
+
+func _spawn_combat_popup(message: String, popup_position: Vector2, tint: Color) -> void:
+    var popup := Label.new()
+    popup.text = message
+    popup.position = popup_position
+    popup.add_theme_font_size_override("font_size", 15)
+    popup.add_theme_color_override("font_color", tint)
+    popup.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+    popup.add_theme_constant_override("shadow_offset_x", 1)
+    popup.add_theme_constant_override("shadow_offset_y", 2)
+    popup.z_index = 20
+    add_child(popup)
+    combat_popups.append({"node": popup, "time": 0.72})
+
+func _update_combat_popups(delta: float) -> void:
+    for index in range(combat_popups.size() - 1, -1, -1):
+        var popup_data: Dictionary = combat_popups[index]
+        var remaining := float(popup_data["time"]) - delta
+        var popup: Label = popup_data["node"]
+        if remaining <= 0.0 or not is_instance_valid(popup):
+            if is_instance_valid(popup):
+                popup.queue_free()
+            combat_popups.remove_at(index)
+            continue
+        popup_data["time"] = remaining
+        popup.position += Vector2(0, -34.0 * delta)
+        popup.modulate.a = clampf(remaining / 0.72, 0.0, 1.0)
+        combat_popups[index] = popup_data
+
+
+func _body_shot() -> void:
+    if finished or not GameState.has_combat_skill("melee", "body_shot"):
+        _set_status("Body Shot is locked. Unlock it in Combat Training (K).")
+        return
+    if attack_cooldown > 0.0 or stamina < 28.0:
+        _set_status("Not ready — recover stamina before a body shot.")
+        return
+    if player.position.distance_to(enemy.position) > PLAYER_ATTACK_RANGE:
+        _set_status("Body shot out of range.")
+        return
+    stamina -= 28.0
+    attack_cooldown = 0.72
+    combo_step = 0
+    var interrupted := telegraph_timer >= 0.0
+    _apply_enemy_damage(34.0, "BODY SHOT")
+    if interrupted:
+        telegraph_timer = -1.0
+        telegraph.visible = false
+        enemy_recovery = 1.0
+    if enemy_health <= 0.0:
+        _handle_enemy_defeated()
+    else:
+        _set_status("BODY SHOT — 34 damage%s." % ("; attack interrupted" if interrupted else ""))
+
+func _guard() -> void:
+    if finished or combat_style != "melee":
+        return
+    if not GameState.has_combat_skill("melee", "guard_up"):
+        _set_status("Guard Up is locked. Unlock it in Combat Training (K).")
+        return
+    if stamina < 8.0 or guard_timer > 0.0:
+        return
+    stamina -= 8.0
+    guard_timer = 0.52
+    _set_status("GUARD UP — hold your ground for the incoming strike.")
+
+
+func _toggle_aim() -> void:
+    if finished or combat_style != "firearms":
+        return
+    aiming = not aiming
+    aim_transition_timer = 0.12 if GameState.has_combat_skill("firearms", "snap_aim") else 0.22
+    _set_status("AIMING — improved shot control." if aiming else "HIP FIRE — move freely.")
+    _refresh()

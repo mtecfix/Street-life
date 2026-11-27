@@ -45,6 +45,9 @@ jobs:
       - name: Run progression and save migration tests
         run: godot --headless --path game --script res://tests/test_progression.gd
 
+      - name: Run combat skill tree tests
+        run: godot --headless --path game --script res://tests/test_combat_skill_trees.gd
+
       - name: Run player movement progression regression tests
         run: godot --headless --path game --script res://tests/test_player_movement.gd
 

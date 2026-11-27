@@ -117,12 +117,12 @@ func _test_save_round_trip(state: Variant, saves: Variant) -> void:
     state.skill_levels = {"power": 1, "endurance": 2, "footwork": 3}
     _check(saves.save_game() == OK, "Saving should succeed.")
     _reset(state)
-    _check(saves.load_game() == OK, "Loading a v5 save should succeed.")
+    _check(saves.load_game() == OK, "Loading a v7 save should succeed.")
     _check(state.player_xp == 40 and state.player_level == 4 and state.skill_points == 2, "XP, level, or skill points did not round-trip.")
     _check(int(state.skill_levels["power"]) == 1 and int(state.skill_levels["endurance"]) == 2 and int(state.skill_levels["footwork"]) == 3, "Skill ranks did not round-trip.")
 
 func _test_legacy_save_migration(state: Variant, saves: Variant) -> void:
-    for legacy_version in [1, 2, 3, 4]:
+    for legacy_version in [1, 2, 3, 4, 5, 6]:
         state.player_xp = 77
         state.player_level = 9
         state.skill_points = 5
@@ -133,7 +133,7 @@ func _test_legacy_save_migration(state: Variant, saves: Variant) -> void:
         _check(int(state.skill_levels.get("power", -1)) == 0 and int(state.skill_levels.get("endurance", -1)) == 0 and int(state.skill_levels.get("footwork", -1)) == 0, "v%d save should default all skill ranks to 0." % legacy_version)
         _check(state.player_cash == 123 and state.encounters_won == 3, "v%d save should keep existing progress." % legacy_version)
 
-    _write_save(JSON.stringify({"version": 6}))
+    _write_save(JSON.stringify({"version": 8}))
     _check(saves.load_game() == ERR_INVALID_DATA, "A save from a newer version should be rejected.")
 
 func _test_save_clamping(state: Variant, saves: Variant) -> void:

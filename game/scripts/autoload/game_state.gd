@@ -8,6 +8,10 @@ const ITEM_DEFINITIONS := {
     "medkit": {"name": "First-aid kit", "price": 18, "heal": 45, "description": "Restores 45 health."},
     "soda": {"name": "Energy soda", "price": 8, "heal": 5, "description": "A small pick-me-up. Restores 5 health."}
 }
+const WEAPON_SHOP := {
+    "smg": {"name": "Compact SMG", "price": 180, "magazine": 24, "reserve": 96},
+    "carbine": {"name": "Street Carbine", "price": 320, "magazine": 20, "reserve": 80}
+}
 
 var player_cash: int = 25
 var player_health: int = 100
@@ -26,6 +30,13 @@ var mission_outcome: String = ""
 var current_encounter_id: String = "corner_brawler"
 var last_combat_won: bool = false
 var inventory: Dictionary = {}
+var owned_weapons: Array = ["sidearm"]
+var equipped_weapon_id: String = "sidearm"
+var weapon_ammo: Dictionary = {
+    "sidearm": {"magazine": 12, "reserve": 48},
+    "smg": {"magazine": 24, "reserve": 96},
+    "carbine": {"magazine": 20, "reserve": 80}
+}
 var reputation: Dictionary = {"locals": 0, "rivals": 0}
 var npc_relationships: Dictionary = {}
 var world_flags: Dictionary = {}
@@ -68,6 +79,45 @@ func purchase_item(item_id: String) -> bool:
         return false
     player_cash -= price
     return add_item(item_id, 1)
+
+func purchase_weapon(weapon_id: String) -> bool:
+    if not WEAPON_SHOP.has(weapon_id) or weapon_id in owned_weapons:
+        return false
+    var weapon: Dictionary = WEAPON_SHOP[weapon_id]
+    var price := int(weapon["price"])
+    if player_cash < price:
+        return false
+    player_cash -= price
+    owned_weapons.append(weapon_id)
+    equipped_weapon_id = weapon_id
+    weapon_ammo[weapon_id] = {"magazine": int(weapon["magazine"]), "reserve": int(weapon["reserve"])}
+    EventBus.inventory_changed.emit("weapon:" + weapon_id, 1)
+    SaveManager.save_game()
+    return true
+
+func equip_weapon(weapon_id: String) -> bool:
+    if weapon_id != "sidearm" and not WEAPON_SHOP.has(weapon_id):
+        return false
+    if weapon_id not in owned_weapons:
+        return false
+    equipped_weapon_id = weapon_id
+    SaveManager.save_game()
+    return true
+
+func set_weapon_ammo(weapon_id: String, magazine: int, reserve: int) -> void:
+    if weapon_id not in owned_weapons:
+        return
+    var profile := FirearmCombatController.get_profile(weapon_id)
+    weapon_ammo[weapon_id] = {
+        "magazine": clampi(magazine, 0, int(profile["magazine"])),
+        "reserve": maxi(0, reserve)
+    }
+
+func get_weapon_ammo(weapon_id: String) -> Dictionary:
+    var profile := FirearmCombatController.get_profile(weapon_id)
+    var defaults := {"magazine": int(profile["magazine"]), "reserve": int(profile["reserve_start"])}
+    var saved: Variant = weapon_ammo.get(weapon_id, defaults)
+    return saved.duplicate(true) if saved is Dictionary else defaults
 
 func use_item(item_id: String) -> bool:
     if not ITEM_DEFINITIONS.has(item_id):
@@ -126,3 +176,47 @@ func get_dodge_cost() -> float:
 
 func get_player_speed() -> float:
     return 225.0 + float(skill_levels.get("footwork", 0)) * 12.0
+
+
+# Separate combat disciplines share the level-up skill-point pool but retain
+# independent unlocks, so a melee build never has to purchase firearm upgrades.
+var combat_skill_unlocks: Dictionary = {"melee": [], "firearms": []}
+
+func purchase_combat_skill(style: String, node_id: String) -> bool:
+    var tree: Dictionary = CombatSkillTrees.get_tree(style)
+    if tree.is_empty():
+        return false
+    var unlocked: Array = combat_skill_unlocks.get(style, [])
+    if not CombatSkillTrees.can_purchase(style, node_id, unlocked, skill_points):
+        return false
+    var node: Dictionary = tree.get("nodes", {}).get(node_id, {})
+    var cost := int(node.get("cost", 0))
+    if cost <= 0 or skill_points < cost:
+        return false
+    unlocked = unlocked.duplicate()
+    unlocked.append(node_id)
+    combat_skill_unlocks[style] = unlocked
+    skill_points -= cost
+    EventBus.progression_changed.emit(player_level, player_xp, skill_points)
+    SaveManager.save_game()
+    return true
+
+func has_combat_skill(style: String, node_id: String) -> bool:
+    var unlocked: Array = combat_skill_unlocks.get(style, [])
+    return node_id in unlocked
+
+func respec_combat_skills(style: String = "") -> int:
+    var refunded := 0
+    var styles := [style] if style in ["melee", "firearms"] else ["melee", "firearms"]
+    for discipline in styles:
+        var tree: Dictionary = CombatSkillTrees.get_tree(discipline)
+        var nodes: Dictionary = tree.get("nodes", {})
+        var unlocked: Array = combat_skill_unlocks.get(discipline, [])
+        for node_id in unlocked:
+            refunded += int(nodes.get(node_id, {}).get("cost", 0))
+        combat_skill_unlocks[discipline] = []
+    if refunded > 0:
+        skill_points += refunded
+        EventBus.progression_changed.emit(player_level, player_xp, skill_points)
+        SaveManager.save_game()
+    return refunded
